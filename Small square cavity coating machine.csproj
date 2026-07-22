@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Small_square_cavity_coating_machine</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\Fonts\Font Awesome 5 Brands-Regular-400.otf" />
+    <None Remove="Resources\Fonts\Font Awesome 5 Free-Regular-400.otf" />
+    <None Remove="Resources\Fonts\Font Awesome 5 Free-Solid-900.otf" />
+    <None Remove="Resources\logo.png" />
+    <None Remove="Resources\menu.png" />
+    <None Remove="Resources\title.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Converters\" />
+    <Folder Include="Resources\Styles\" />   
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Fonts\Font Awesome 5 Brands-Regular-400.otf" />
+    <Resource Include="Resources\Fonts\Font Awesome 5 Free-Regular-400.otf" />
+    <Resource Include="Resources\Fonts\Font Awesome 5 Free-Solid-900.otf" />
+    <Resource Include="Resources\logo.png" />
+    <Resource Include="Resources\menu.png" />
+    <Resource Include="Resources\title.png" />
+  </ItemGroup>
+
+</Project>
