@@ -22,7 +22,7 @@ namespace Small_square_cavity_coating_machine.Views
         // 提前创建六个页面对象
         private readonly IO _ioPage = new();
         private readonly Parameter _parameterPage = new();
-        private readonly Control _controlmPage = new();
+        private readonly Controlview _controlmPage = new();
         private readonly Process _processPage = new();
         private readonly History _historyPage = new();
         private readonly User _userPage = new();

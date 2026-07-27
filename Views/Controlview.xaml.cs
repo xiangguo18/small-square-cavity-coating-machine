@@ -14,13 +14,22 @@ using System.Windows.Shapes;
 namespace Small_square_cavity_coating_machine.Views
 {
     /// <summary>
-    /// Control.xaml 的交互逻辑
+    /// Controlview.xaml 的交互逻辑
     /// </summary>
-    public partial class Control : Page
+    public partial class Controlview : Page
     {
-        public Control()
+        public Controlview()
         {
             InitializeComponent();
+        }
+
+        private void VacuumGaugeControl_Loaded(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void ValveControl_Click(object sender, RoutedEventArgs e)
+        {
         }
     }
 }
