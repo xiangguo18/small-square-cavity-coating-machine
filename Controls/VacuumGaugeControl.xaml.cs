@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace Small_square_cavity_coating_machine.Controls;
 
@@ -69,6 +70,27 @@ public partial class VacuumGaugeControl : UserControl
             typeof(VacuumGaugeControl),
             new FrameworkPropertyMetadata(68d));
 
+    public static readonly DependencyProperty IsReadingEnabledProperty =
+        DependencyProperty.Register(
+            nameof(IsReadingEnabled),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(true));
+
+    public static readonly DependencyProperty CanToggleProperty =
+        DependencyProperty.Register(
+            nameof(CanToggle),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty ToggleCommandProperty =
+        DependencyProperty.Register(
+            nameof(ToggleCommand),
+            typeof(ICommand),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(null));
+
     public string DisplayName
     {
         get => (string)GetValue(DisplayNameProperty);
@@ -127,5 +149,29 @@ public partial class VacuumGaugeControl : UserControl
     {
         get => (double)GetValue(ReadoutHeightProperty);
         set => SetValue(ReadoutHeightProperty, value);
+    }
+
+    /// <summary>
+    /// Indicates whether the gauge valve is open and its live reading is available.
+    /// </summary>
+    public bool IsReadingEnabled
+    {
+        get => (bool)GetValue(IsReadingEnabledProperty);
+        set => SetValue(IsReadingEnabledProperty, value);
+    }
+
+    /// <summary>
+    /// Allows the gauge symbol to issue a toggle command.
+    /// </summary>
+    public bool CanToggle
+    {
+        get => (bool)GetValue(CanToggleProperty);
+        set => SetValue(CanToggleProperty, value);
+    }
+
+    public ICommand? ToggleCommand
+    {
+        get => (ICommand?)GetValue(ToggleCommandProperty);
+        set => SetValue(ToggleCommandProperty, value);
     }
 }

@@ -29,6 +29,20 @@ public class ValveControl : DeviceButtonBase
             typeof(ValveControl),
             new FrameworkPropertyMetadata(false));
 
+    public static readonly DependencyProperty UseOpeningPercentageProperty =
+        DependencyProperty.Register(
+            nameof(UseOpeningPercentage),
+            typeof(bool),
+            typeof(ValveControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty OpeningPercentageProperty =
+        DependencyProperty.Register(
+            nameof(OpeningPercentage),
+            typeof(double),
+            typeof(ValveControl),
+            new FrameworkPropertyMetadata(0d));
+
     public Orientation Orientation
     {
         get => (Orientation)GetValue(OrientationProperty);
@@ -39,5 +53,23 @@ public class ValveControl : DeviceButtonBase
     {
         get => (bool)GetValue(IsOpenProperty);
         set => SetValue(IsOpenProperty, value);
+    }
+
+    /// <summary>
+    /// Uses a proportional active fill instead of the binary IsOpen fill.
+    /// </summary>
+    public bool UseOpeningPercentage
+    {
+        get => (bool)GetValue(UseOpeningPercentageProperty);
+        set => SetValue(UseOpeningPercentageProperty, value);
+    }
+
+    /// <summary>
+    /// Active fill percentage, clamped visually to the 0–100 range.
+    /// </summary>
+    public double OpeningPercentage
+    {
+        get => (double)GetValue(OpeningPercentageProperty);
+        set => SetValue(OpeningPercentageProperty, value);
     }
 }

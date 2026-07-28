@@ -1,0 +1,79 @@
+<UserControl x:Class="Small_square_cavity_coating_machine.Controls.HeaterControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
+             x:Name="Root"
+             mc:Ignorable="d"
+             d:DesignWidth="360"
+             d:DesignHeight="88"
+             MinWidth="250"
+             MinHeight="76">
+    <Border Padding="10,8"
+            Background="#F8FAFC"
+            BorderBrush="#AEBCC8"
+            BorderThickness="1.5"
+            CornerRadius="7">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="70"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="118"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="{Binding DisplayName, ElementName=Root}"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="#1F2D3D"
+                       VerticalAlignment="Center"/>
+
+            <Grid Grid.Column="1" Margin="8,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock VerticalAlignment="Center" Foreground="#52616B">
+                    <Run Text="当前温度  "/>
+                    <Run Text="{Binding CurrentTemperature, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                         FontSize="16"
+                         FontWeight="Bold"
+                         Foreground="#147BD1"/>
+                    <Run Text=" ℃"/>
+                </TextBlock>
+                <StackPanel Grid.Row="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="预设温度"
+                               Width="65"
+                               Foreground="#52616B"
+                               VerticalAlignment="Center"/>
+                    <TextBox x:Name="SetpointTextBox"
+                             Width="70"
+                             Height="25"
+                             Padding="4,1"
+                             Text="{Binding SetpointTemperature, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                             HorizontalContentAlignment="Right"
+                             VerticalContentAlignment="Center"
+                             PreviewKeyDown="SetpointTextBox_PreviewKeyDown"
+                             LostKeyboardFocus="SetpointTextBox_LostKeyboardFocus"/>
+                    <TextBlock Text=" ℃"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <controls:ShutterSwitchButton Grid.Column="2"
+                                          Width="112"
+                                          Height="40"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          DeviceName="{Binding DisplayName, ElementName=Root}"
+                                          IsOn="{Binding IsRunning, ElementName=Root}"
+                                          OnText="启动"
+                                          OffText="停止"
+                                          IsInterlockReleased="{Binding IsInterlockReleased, ElementName=Root}"
+                                          IsFaulted="{Binding IsFaulted, ElementName=Root}"
+                                          Command="{Binding ToggleCommand, ElementName=Root}"/>
+        </Grid>
+    </Border>
+</UserControl>

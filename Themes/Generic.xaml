@@ -10,6 +10,130 @@
     <SolidColorBrush x:Key="PipeBodyBrush" Color="#B8C2CC"/>
     <SolidColorBrush x:Key="PipeFlowBrush" Color="#147BD1"/>
     <controls:VerticalTextConverter x:Key="VerticalTextConverter"/>
+    <controls:PercentageToRatioConverter x:Key="PercentageToRatioConverter"/>
+
+    <!-- 挡板开关：命令由 Button 发出，IsOn 仅显示设备反馈。 -->
+    <Style TargetType="{x:Type controls:ShutterSwitchButton}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="90"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type controls:ShutterSwitchButton}">
+                    <Border Background="{TemplateBinding Background}"
+                            ToolTip="{TemplateBinding DeviceName}">
+                        <Viewbox Stretch="Fill" StretchDirection="Both">
+                            <Canvas Width="180" Height="64">
+                                <Border x:Name="Track"
+                                        Canvas.Left="2"
+                                        Canvas.Top="2"
+                                        Width="176"
+                                        Height="60"
+                                        CornerRadius="30"
+                                        Background="#F44336"
+                                        BorderBrush="#B82026"
+                                        BorderThickness="3"/>
+                                <TextBlock x:Name="OnLabel"
+                                           Canvas.Left="12"
+                                           Canvas.Top="12"
+                                           Width="108"
+                                           Height="40"
+                                           Visibility="Collapsed"
+                                           Text="{TemplateBinding OnText}"
+                                           FontSize="25"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="OffLabel"
+                                           Canvas.Left="60"
+                                           Canvas.Top="12"
+                                           Width="108"
+                                           Height="40"
+                                           Text="{TemplateBinding OffText}"
+                                           FontSize="25"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                                <Ellipse x:Name="Knob"
+                                         Canvas.Left="8"
+                                         Canvas.Top="7"
+                                         Width="50"
+                                         Height="50"
+                                         Fill="White"
+                                         Stroke="#E0E4E8"
+                                         StrokeThickness="1.5">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="7"
+                                                          Direction="315"
+                                                          Opacity="0.38"
+                                                          ShadowDepth="3"/>
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsOn" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="#32B94B"/>
+                            <Setter TargetName="Track" Property="BorderBrush" Value="#0A8F45"/>
+                            <Setter TargetName="OnLabel" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="OffLabel" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Knob" Property="Canvas.Left" Value="122"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob"
+                                                         Storyboard.TargetProperty="(Canvas.Left)"
+                                                         From="8"
+                                                         To="122"
+                                                         Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseInOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Knob"
+                                                         Storyboard.TargetProperty="(Canvas.Left)"
+                                                         From="122"
+                                                         To="8"
+                                                         Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseInOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsFaulted" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="#C62828"/>
+                            <Setter TargetName="Track" Property="BorderBrush" Value="#8E0000"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.75"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!-- 阀门：两个三角形组成沙漏图案。 -->
     <Style TargetType="{x:Type controls:ValveControl}">
@@ -52,6 +176,32 @@
                                           Stroke="{StaticResource DeviceOutlineBrush}"
                                           StrokeThickness="4"
                                           StrokeLineJoin="Round"/>
+                                    <Canvas x:Name="PercentageFill"
+                                            Width="120"
+                                            Height="100"
+                                            Visibility="Collapsed">
+                                        <Canvas.OpacityMask>
+                                            <LinearGradientBrush StartPoint="0,1"
+                                                                 EndPoint="0,0">
+                                                <GradientStop Color="White"
+                                                              Offset="0"/>
+                                                <GradientStop Color="White"
+                                                              Offset="{Binding OpeningPercentage,
+                                                                  RelativeSource={RelativeSource TemplatedParent},
+                                                                  Converter={StaticResource PercentageToRatioConverter}}"/>
+                                                <GradientStop Color="Transparent"
+                                                              Offset="{Binding OpeningPercentage,
+                                                                  RelativeSource={RelativeSource TemplatedParent},
+                                                                  Converter={StaticResource PercentageToRatioConverter}}"/>
+                                                <GradientStop Color="Transparent"
+                                                              Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Canvas.OpacityMask>
+                                        <Path Data="M 31,22 L 89,22 L 60,50 Z"
+                                              Fill="{StaticResource DeviceActiveBrush}"/>
+                                        <Path Data="M 31,78 L 89,78 L 60,50 Z"
+                                              Fill="{StaticResource DeviceActiveBrush}"/>
+                                    </Canvas>
                                 </Canvas>
 
                                 <!-- 横向阀门的名称放在图形下方。 -->
@@ -103,6 +253,11 @@
                             <Setter TargetName="ValveBodyBottom" Property="Fill"
                                     Value="{StaticResource DeviceActiveBrush}"/>
                         </Trigger>
+                        <Trigger Property="UseOpeningPercentage" Value="True">
+                            <Setter TargetName="PercentageFill"
+                                    Property="Visibility"
+                                    Value="Visible"/>
+                        </Trigger>
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
                         </Trigger>
@@ -111,9 +266,9 @@
                                     Value="{StaticResource DeviceFaultBrush}"/>
                             <Setter TargetName="ValveBodyBottom" Property="Fill"
                                     Value="{StaticResource DeviceFaultBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Opacity" Value="0.86"/>
+                            <Setter TargetName="PercentageFill"
+                                    Property="Visibility"
+                                    Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
@@ -245,9 +400,6 @@
                             <Setter TargetName="PumpBody" Property="Fill"
                                     Value="{StaticResource DeviceFaultBrush}"/>
                         </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Opacity" Value="0.86"/>
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
                         </Trigger>
@@ -372,9 +524,6 @@
                         <Trigger Property="IsFaulted" Value="True">
                             <Setter TargetName="PumpBody" Property="Fill"
                                     Value="{StaticResource DeviceFaultBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Opacity" Value="0.86"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
@@ -517,6 +666,86 @@
                         <Trigger Property="Orientation"
                                  Value="{x:Static controls:ElbowOrientation.TopLeft}">
                             <Setter TargetName="ElbowVisual" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="270"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 三通：基础图形的单独支口朝上，通过旋转形成四种方向。 -->
+    <Style TargetType="{x:Type controls:TeePipeControl}">
+        <Setter Property="MinWidth" Value="24"/>
+        <Setter Property="MinHeight" Value="24"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type controls:TeePipeControl}">
+                    <Grid ClipToBounds="False" Background="Transparent">
+                        <Viewbox Stretch="Fill" StretchDirection="Both">
+                            <Canvas Width="100" Height="100">
+                                <Grid x:Name="TeeVisual"
+                                      Width="100" Height="100"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Grid.RenderTransform>
+                                        <RotateTransform Angle="0"/>
+                                    </Grid.RenderTransform>
+
+                                    <!--
+                                    子路径方向依次为：支口到交汇点、交汇点到左端、交汇点到右端。
+                                    Forward 因而表现为分流，Reverse 表现为汇流。
+                                    -->
+                                    <Path Data="M 50,0 L 50,50 M 50,50 L 0,50 M 50,50 L 100,50"
+                                          Stroke="{StaticResource PipeBodyBrush}"
+                                          StrokeThickness="{TemplateBinding PipeThickness}"
+                                          StrokeStartLineCap="Square"
+                                          StrokeEndLineCap="Square"
+                                          StrokeLineJoin="Round"/>
+                                    <Path x:Name="PART_FlowPath"
+                                          Data="M 50,0 L 50,50 M 50,50 L 0,50 M 50,50 L 100,50"
+                                          Style="{StaticResource FlowPathStyle}"/>
+
+                                    <!-- 管道外轮廓在交汇处留口，避免内部边线割裂三通。 -->
+                                    <Path Data="M 0,41 L 41,41 L 41,0"
+                                          Fill="Transparent"
+                                          Stroke="#66727E"
+                                          StrokeThickness="1.5"/>
+                                    <Path Data="M 59,0 L 59,41 L 100,41"
+                                          Fill="Transparent"
+                                          Stroke="#66727E"
+                                          StrokeThickness="1.5"/>
+                                    <Path Data="M 0,59 L 100,59"
+                                          Fill="Transparent"
+                                          Stroke="#66727E"
+                                          StrokeThickness="1.5"/>
+                                </Grid>
+                            </Canvas>
+                        </Viewbox>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Orientation"
+                                 Value="{x:Static controls:TeeOrientation.BranchRight}">
+                            <Setter TargetName="TeeVisual" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="90"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="Orientation"
+                                 Value="{x:Static controls:TeeOrientation.BranchBottom}">
+                            <Setter TargetName="TeeVisual" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="180"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="Orientation"
+                                 Value="{x:Static controls:TeeOrientation.BranchLeft}">
+                            <Setter TargetName="TeeVisual" Property="RenderTransform">
                                 <Setter.Value>
                                     <RotateTransform Angle="270"/>
                                 </Setter.Value>

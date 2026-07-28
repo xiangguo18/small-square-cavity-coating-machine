@@ -1,0 +1,78 @@
+<UserControl x:Class="Small_square_cavity_coating_machine.Controls.SampleStageSpeedControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             x:Name="Root"
+             mc:Ignorable="d"
+             d:DesignWidth="250"
+             d:DesignHeight="118"
+             MinWidth="210"
+             MinHeight="108">
+    <Border Padding="10,7"
+            Background="#F8FAFC"
+            BorderBrush="#AEBCC8"
+            BorderThickness="1.5"
+            CornerRadius="7">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="30"/>
+                <RowDefinition Height="32"/>
+                <RowDefinition Height="34"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="{Binding DisplayName, ElementName=Root}"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="#1F2D3D"
+                       TextAlignment="Center"
+                       VerticalAlignment="Center"/>
+
+            <Grid Grid.Row="1" Margin="8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="78"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="当前转速"
+                           Foreground="#52616B"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CurrentSpeed, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="#147BD1"
+                           TextAlignment="Right"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Unit, ElementName=Root}"
+                           Margin="5,0,0,0"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="78"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="设定转速"
+                           Foreground="#52616B"
+                           VerticalAlignment="Center"/>
+                <TextBox x:Name="SetpointTextBox"
+                         Grid.Column="1"
+                         Height="25"
+                         Padding="4,1"
+                         Text="{Binding SetpointSpeed, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                         HorizontalContentAlignment="Right"
+                         VerticalContentAlignment="Center"
+                         PreviewKeyDown="SetpointTextBox_PreviewKeyDown"
+                         LostKeyboardFocus="SetpointTextBox_LostKeyboardFocus"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Unit, ElementName=Root}"
+                           Margin="5,0,0,0"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

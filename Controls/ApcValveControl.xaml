@@ -1,0 +1,174 @@
+<UserControl x:Class="Small_square_cavity_coating_machine.Controls.ApcValveControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
+             x:Name="Root"
+             mc:Ignorable="d"
+             d:DesignWidth="310"
+             d:DesignHeight="192"
+             MinWidth="90"
+             MinHeight="90"
+             FontSize="18"
+             Loaded="ApcValveControl_Loaded">
+    <Viewbox Stretch="Uniform"
+             StretchDirection="Both">
+        <Border Padding="9">
+            <Canvas x:Name="LayoutCanvas"
+                    Width="310"
+                    Height="192">
+                <controls:ShutterSwitchButton x:Name="ModeSwitch"
+                                              Width="112"
+                                              Height="36"
+                                              DeviceName="{Binding DisplayName, ElementName=Root}"
+                                              IsOn="{Binding IsPositioningMode, ElementName=Root}"
+                                              OnText="定位"
+                                              OffText="控压"
+                                              IsFaulted="{Binding IsFaulted, ElementName=Root}"
+                                              Command="{Binding ToggleModeCommand, ElementName=Root}"/>
+
+                <Border x:Name="ModeReadout"
+                        Width="190"
+                        Height="76"
+                        Background="#102535"
+                        BorderBrush="#263238"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True">
+                <Grid x:Name="ModeContentHost"
+                      ClipToBounds="True">
+                    <Grid x:Name="PositionPanel">
+                        <Grid.RenderTransform>
+                            <TranslateTransform X="0"/>
+                        </Grid.RenderTransform>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Margin="8,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="25"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="当前位置"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                            <Border Grid.Column="1"
+                                    Padding="4,0">
+                                <TextBlock Text="{Binding CurrentPosition, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                                           FontWeight="Bold"
+                                           Foreground="#51C8FF"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="2"
+                                       Text=" %"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Grid.Row="1"
+                              Margin="8,0"
+                              VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="25"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="设定位置"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                            <TextBox x:Name="PositionSetpointTextBox"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Padding="4,1"
+                                     Text="{Binding PositionSetpoint, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                                     HorizontalContentAlignment="Right"
+                                     VerticalContentAlignment="Center"
+                                     PreviewKeyDown="PositionSetpointTextBox_PreviewKeyDown"
+                                     LostKeyboardFocus="PositionSetpointTextBox_LostKeyboardFocus" Margin="0,1,0,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text=" %"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Grid>
+
+                    <Grid x:Name="PressurePanel"
+                          Opacity="0">
+                        <Grid.RenderTransform>
+                            <TranslateTransform X="220"/>
+                        </Grid.RenderTransform>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Margin="8,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="25"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="当前压力"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                            <Border Grid.Column="1"
+                                    Padding="4,0">
+                                <TextBlock Text="{Binding CurrentPressure, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.00}}"
+                                           FontWeight="Bold"
+                                           Foreground="#51C8FF"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="2"
+                                       Text=" Pa"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Grid.Row="1"
+                              Margin="8,0"
+                              VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="25"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="设定压力"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                            <TextBox x:Name="PressureSetpointTextBox"
+                                     Grid.Column="1"
+                                     Height="24"
+                                     Padding="4,1"
+                                     Text="{Binding PressureSetpoint, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.00}}"
+                                     HorizontalContentAlignment="Right"
+                                     VerticalContentAlignment="Center"
+                                     PreviewKeyDown="PressureSetpointTextBox_PreviewKeyDown"
+                                     LostKeyboardFocus="PressureSetpointTextBox_LostKeyboardFocus"/>
+                            <TextBlock Grid.Column="2"
+                                       Text=" Pa"
+                                       Foreground="#DCEBFA"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Grid>
+
+                </Grid>
+                </Border>
+
+                <controls:ValveControl x:Name="ValveSymbol"
+                                       Width="112"
+                                       Height="108"
+                                       Focusable="False"
+                                       IsHitTestVisible="False"
+                                       DeviceName="{Binding DisplayName, ElementName=Root}"
+                                       Orientation="{Binding Orientation, ElementName=Root}"
+                                       IsOpen="False"
+                                       UseOpeningPercentage="True"
+                                       OpeningPercentage="{Binding CurrentPosition, ElementName=Root}"
+                                       IsInterlockReleased="{Binding IsInterlockReleased, ElementName=Root}"
+                                       IsFaulted="{Binding IsFaulted, ElementName=Root}"/>
+            </Canvas>
+        </Border>
+    </Viewbox>
+</UserControl>

@@ -31,7 +31,7 @@
                 <Border Grid.Row="0" Background="#1667B1" CornerRadius="2,2,0,0">
                     <TextBlock Text="{Binding DisplayName, ElementName=Root}"
                                Foreground="White"
-                               FontSize="17"
+                               FontSize="20"
                                FontWeight="SemiBold"
                                TextAlignment="Center"
                                VerticalAlignment="Center"
@@ -45,7 +45,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="当前流量"
                                Foreground="#DCEBFA"
-                               FontSize="13"
+                               FontSize="17"
                                VerticalAlignment="Center"
                                Margin="8,0,0,0"/>
                     <TextBlock Grid.Column="1"
@@ -72,7 +72,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="设定流量"
                                Foreground="#37474F"
-                               FontSize="13"
+                               FontSize="17"
                                VerticalAlignment="Center"
                                Margin="8,0,0,0"/>
                     <TextBlock Grid.Column="1"

@@ -32,41 +32,79 @@
                 SymbolRotation 只作用于圆圈和连接杆。
                 使用以圆心为中心的 88×88 正方形区域，旋转到任意方向都不会改变符号占位。
             -->
-            <Grid x:Name="GaugeSymbol"
-                  Grid.Row="1"
-                  Grid.Column="1"
-                  Width="88"
-                  Height="88">
-                <Canvas Width="88"
-                        Height="88">
-                    <Canvas.RenderTransform>
-                        <RotateTransform Angle="{Binding SymbolRotation, ElementName=Root}"
-                                         CenterX="44"
-                                         CenterY="44"/>
-                    </Canvas.RenderTransform>
-                    <Line X1="44" Y1="76" X2="44" Y2="88"
-                          Stroke="#263238"
-                          StrokeThickness="4"
-                          StrokeStartLineCap="Round"
-                          StrokeEndLineCap="Round"/>
-                    <Ellipse Canvas.Left="10"
-                             Canvas.Top="10"
-                             Width="68"
-                             Height="68"
-                             Fill="#F8FAFC"
-                             Stroke="#263238"
-                             StrokeThickness="3"/>
-                </Canvas>
+            <Button x:Name="GaugeSymbolButton"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Width="88"
+                    Height="88"
+                    Padding="0"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    Focusable="{Binding CanToggle, ElementName=Root}"
+                    IsHitTestVisible="{Binding CanToggle, ElementName=Root}"
+                    Command="{Binding ToggleCommand, ElementName=Root}">
+                <Button.Style>
+                    <Style TargetType="{x:Type Button}">
+                        <Setter Property="Cursor" Value="Arrow"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanToggle, ElementName=Root}"
+                                         Value="True">
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Button.Template>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Grid>
+                            <Canvas Width="88"
+                                    Height="88">
+                                <Canvas.RenderTransform>
+                                    <RotateTransform Angle="{Binding SymbolRotation, ElementName=Root}"
+                                                     CenterX="44"
+                                                     CenterY="44"/>
+                                </Canvas.RenderTransform>
+                                <Line X1="44" Y1="76" X2="44" Y2="88"
+                                      Stroke="#263238"
+                                      StrokeThickness="4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"/>
+                                <Ellipse x:Name="GaugeBody"
+                                         Canvas.Left="10"
+                                         Canvas.Top="10"
+                                         Width="68"
+                                         Height="68"
+                                         Fill="#AEB8BF"
+                                         Stroke="#263238"
+                                         StrokeThickness="3"/>
+                            </Canvas>
 
-                <!-- 高真空计内部符号始终保持正向，不跟随圆圈和连接杆旋转。 -->
-                <Path Data="M 21,25 L 44,65 L 67,25 M 16,45 L 72,45"
-                      Fill="Transparent"
-                      Stroke="#263238"
-                      StrokeThickness="4"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round"
-                      StrokeLineJoin="Round"/>
-            </Grid>
+                            <!-- 高真空计内部符号始终保持正向，不跟随圆圈和连接杆旋转。 -->
+                            <Path Data="M 21,25 L 44,65 L 67,25 M 16,45 L 72,45"
+                                  Fill="Transparent"
+                                  Stroke="#263238"
+                                  StrokeThickness="4"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
+                                         Value="True">
+                                <Setter TargetName="GaugeBody"
+                                        Property="Fill"
+                                        Value="#55C878"/>
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
 
             <!-- 名称和真空度文本框可通过 ReadoutWidth、ReadoutHeight 独立调整。 -->
             <Border x:Name="GaugeReadout"
@@ -119,16 +157,28 @@
                         </Grid.RowDefinitions>
                         <TextBlock Text="{Binding DisplayName, ElementName=Root}"
                                    Foreground="#DCEBFA"
-                                   FontSize="15"
+                                   FontSize="20"
                                    Margin="9,3,9,0"
                                    TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Grid.Row="1"
+                        <TextBlock x:Name="LiveReading"
+                                   Grid.Row="1"
                                    Foreground="#51C8FF"
                                    FontSize="23"
                                    FontWeight="Bold"
                                    Margin="9,0,9,4"
                                    TextAlignment="Right"
                                    VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
+                                                     Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
                             <TextBlock.Text>
                                 <MultiBinding Converter="{StaticResource NumericValueConverter}">
                                     <Binding Path="VacuumValue" ElementName="Root"/>
@@ -136,6 +186,27 @@
                                     <Binding Path="Unit" ElementName="Root"/>
                                 </MultiBinding>
                             </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock Grid.Row="1"
+                                   Foreground="#AEB8BF"
+                                   FontSize="23"
+                                   FontWeight="Bold"
+                                   Margin="9,0,9,4"
+                                   TextAlignment="Right"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
+                                                     Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                            <Run Text="-- "/>
+                            <Run Text="{Binding Unit, ElementName=Root}"/>
                         </TextBlock>
                     </Grid>
                 </Viewbox>
