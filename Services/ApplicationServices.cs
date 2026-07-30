@@ -1,7 +1,10 @@
+using Small_square_cavity_coating_machine.Models;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Services.History;
+using Small_square_cavity_coating_machine.Services.Recipes;
 using Small_square_cavity_coating_machine.ViewModels;
 using Small_square_cavity_coating_machine.ViewModels.History;
+using Small_square_cavity_coating_machine.ViewModels.Recipes;
 using System.Windows.Threading;
 
 namespace Small_square_cavity_coating_machine.Services;
@@ -26,6 +29,25 @@ public sealed class ApplicationServices : IDisposable
         SeedSimulationHistory();
 
         ControlViewModel = new ControlViewModel(OperationLogRepository);
+#if DEBUG
+        RecipePlcGateway = new SimulatedRecipePlcGateway();
+        ApplicationStatusViewModel.Instance.PlcConnectionState = PlcConnectionState.Connected;
+#else
+        RecipePlcGateway = new UnavailableRecipePlcGateway();
+#endif
+        var recipeImporter = new ExcelRecipeImporter();
+        var recipeDialogService = new WpfRecipeUserDialogService();
+        var recipeDispatchService = new RecipeDispatchService(
+            RecipePlcGateway,
+            OperationLogRepository);
+        ProcessViewModel = new ProcessViewModel(
+            recipeImporter,
+            recipeDispatchService,
+            RecipePlcGateway,
+            recipeDialogService,
+            OperationLogRepository,
+            ApplicationStatusViewModel.Instance);
+
         var liveTrend = new LiveTrendViewModel(
             dispatcher,
             SessionTrendStore,
@@ -55,6 +77,10 @@ public sealed class ApplicationServices : IDisposable
 
     public ControlViewModel ControlViewModel { get; }
 
+    public IRecipePlcGateway RecipePlcGateway { get; }
+
+    public ProcessViewModel ProcessViewModel { get; }
+
     public HistoryViewModel HistoryViewModel { get; }
 
     public Task StartAsync()
@@ -71,6 +97,7 @@ public sealed class ApplicationServices : IDisposable
     public void Dispose()
     {
         _shutdown.Cancel();
+        ProcessViewModel.Dispose();
         _telemetrySource.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _shutdown.Dispose();
     }

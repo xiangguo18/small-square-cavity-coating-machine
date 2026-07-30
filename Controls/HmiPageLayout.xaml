@@ -93,6 +93,32 @@
                     </TextBlock>
                 </StackPanel>
 
+                <Grid Grid.Column="1"
+                      Margin="24,0"
+                      VerticalAlignment="Center">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RecipeStatusText, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
+                                             Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               Foreground="#124A70"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding RecipeStatusText, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}">
+                        <Run FontWeight="Bold" Text="配方镀膜状态："/>
+                        <Run Text="{Binding RecipeStatusText, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}, Mode=OneWay}"/>
+                    </TextBlock>
+                </Grid>
+
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">

@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <EmbeddedResource Remove="Tests\**\*" />
+    <None Remove="Tests\**\*" />
+    <Page Remove="Tests\**\*.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\Fonts\Font Awesome 5 Brands-Regular-400.otf" />
     <None Remove="Resources\Fonts\Font Awesome 5 Free-Regular-400.otf" />
     <None Remove="Resources\Fonts\Font Awesome 5 Free-Solid-900.otf" />
@@ -20,6 +27,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
     <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
   </ItemGroup>
 

@@ -33,7 +33,7 @@ namespace Small_square_cavity_coating_machine.Views
             _ioPage = new IO();
             _parameterPage = new Parameter();
             _controlmPage = new Controlview(services.ControlViewModel);
-            _processPage = new Process();
+            _processPage = new Process(services.ProcessViewModel);
             _historyPage = new History(services.HistoryViewModel);
             _userPage = new User();
 

@@ -14,6 +14,9 @@ public partial class ApplicationStatusViewModel : ObservableObject
     [ObservableProperty]
     private PlcConnectionState plcConnectionState = PlcConnectionState.Disconnected;
 
+    [ObservableProperty]
+    private string recipeStatusText = string.Empty;
+
     private ApplicationStatusViewModel()
     {
     }

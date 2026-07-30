@@ -1,26 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows;
+using Small_square_cavity_coating_machine.Models.Recipes;
+using Small_square_cavity_coating_machine.ViewModels.Recipes;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
-namespace Small_square_cavity_coating_machine.Views
+namespace Small_square_cavity_coating_machine.Views;
+
+public partial class Process : Page
 {
-    /// <summary>
-    /// Process.xaml 的交互逻辑
-    /// </summary>
-    public partial class Process : Page
+    private readonly ProcessViewModel _viewModel;
+
+    public Process(ProcessViewModel viewModel)
     {
-        public Process()
+        _viewModel = viewModel;
+        InitializeComponent();
+        DataContext = viewModel;
+    }
+
+    private void RecipeGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is DataGrid grid)
         {
-            InitializeComponent();
+            _viewModel.SetSelectedLayers(grid.SelectedItems.Cast<RecipeLayer>());
         }
     }
 }
