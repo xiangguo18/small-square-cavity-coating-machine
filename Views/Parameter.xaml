@@ -1,14 +1,20 @@
-﻿<Page x:Class="Small_square_cavity_coating_machine.Views.Parameter"
+<Page x:Class="Small_square_cavity_coating_machine.Views.Parameter"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      xmlns:local="clr-namespace:Small_square_cavity_coating_machine.Views"
+      xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
       mc:Ignorable="d" 
-      d:DesignHeight="450" d:DesignWidth="800"
+      d:DesignHeight="750" d:DesignWidth="1120"
+      Background="#EEF2F5"
       Title="Parameter">
 
-    <Grid>
-        <TextBlock Text="参数设置" FontSize="55" Background="White" TextAlignment="Center"/>
-    </Grid>
+    <controls:HmiPageLayout PageTitle="参数设置">
+        <controls:HmiPageLayout.PageContent>
+            <Border Background="White"
+                    BorderBrush="#D3DDE5"
+                    BorderThickness="1"
+                    CornerRadius="8"/>
+        </controls:HmiPageLayout.PageContent>
+    </controls:HmiPageLayout>
 </Page>

@@ -5,10 +5,36 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              x:Name="Root"
              mc:Ignorable="d"
-             d:DesignWidth="250"
-             d:DesignHeight="118"
+             d:DesignWidth="520"
+             d:DesignHeight="146"
              MinWidth="210"
-             MinHeight="108">
+             MinHeight="140">
+    <UserControl.Resources>
+        <Style x:Key="RotationButtonStyle"
+               TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="96"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Margin" Value="7,2"/>
+            <Setter Property="Background" Value="#E7EDF2"/>
+            <Setter Property="BorderBrush" Value="#7D8B95"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Foreground" Value="#263238"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="True">
+                    <Setter Property="Background" Value="#55C878"/>
+                    <Setter Property="BorderBrush" Value="#208844"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Opacity" Value="0.78"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Border Padding="10,7"
             Background="#F8FAFC"
             BorderBrush="#AEBCC8"
@@ -16,9 +42,10 @@
             CornerRadius="7">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="32"/>
-                <RowDefinition Height="34"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="27"/>
+                <RowDefinition Height="31"/>
+                <RowDefinition Height="40"/>
             </Grid.RowDefinitions>
 
             <TextBlock Text="{Binding DisplayName, ElementName=Root}"
@@ -73,6 +100,20 @@
                            Margin="5,0,0,0"
                            VerticalAlignment="Center"/>
             </Grid>
+
+            <StackPanel Grid.Row="3"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Button Content="正转"
+                        Style="{StaticResource RotationButtonStyle}"
+                        Tag="{Binding IsForwardRunning, ElementName=Root}"
+                        Command="{Binding ForwardCommand, ElementName=Root}"/>
+                <Button Content="反转"
+                        Style="{StaticResource RotationButtonStyle}"
+                        Tag="{Binding IsReverseRunning, ElementName=Root}"
+                        Command="{Binding ReverseCommand, ElementName=Root}"/>
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

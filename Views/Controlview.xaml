@@ -4,38 +4,41 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
-      xmlns:viewModels="clr-namespace:Small_square_cavity_coating_machine.ViewModels"
       mc:Ignorable="d"
       d:DesignHeight="750"
       d:DesignWidth="1120"
       Background="#EEF2F5"
       Title="系统状态">
 
-    <Page.DataContext>
-        <viewModels:ControlViewModel/>
-    </Page.DataContext>
+    <Page.Resources>
+        <Style x:Key="SystemControlButtonStyle"
+               TargetType="{x:Type Button}">
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Background" Value="#E7EDF2"/>
+            <Setter Property="BorderBrush" Value="#7D8B95"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Foreground" Value="#263238"/>
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="True">
+                    <Setter Property="Background" Value="#55C878"/>
+                    <Setter Property="BorderBrush" Value="#208844"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Opacity" Value="0.78"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <Grid Margin="4,0,4,14">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock Text="系统状态"
-                               FontSize="50"
-                               FontWeight="SemiBold"
-                               Foreground="#1F2D3D"/>
-            </StackPanel>
-            <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
+    <controls:HmiPageLayout PageTitle="系统状态">
+        <controls:HmiPageLayout.HeaderRightContent>
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
                 <Ellipse Width="13" Height="13"
                              Fill="#20D34A"
                              Stroke="#263238"
@@ -51,10 +54,10 @@
                                Margin="7,0,0,0"
                                VerticalAlignment="Center"/>
             </StackPanel>
-        </Grid>
+        </controls:HmiPageLayout.HeaderRightContent>
 
-        <Border Grid.Row="1"
-                    Padding="12"
+        <controls:HmiPageLayout.PageContent>
+            <Border Padding="12"
                     Background="White"
                     BorderBrush="#D6DEE5"
                     BorderThickness="1"
@@ -402,6 +405,70 @@
                             Command="{Binding ToggleLowerForelineValveCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                     </Canvas>
 
+                    <!-- 系统级离线演示命令；后续由 OPC UA 命令确认流程替换。 -->
+                    <Border Width="305"
+                            Height="205"
+                            Margin="530,445,0,0"
+                            Padding="8"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Background="#F3F6F8"
+                            BorderBrush="#AEBCC8"
+                            BorderThickness="1.5"
+                            CornerRadius="7">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="30"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="系统控制"
+                                       FontSize="19"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1F2D3D"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                            <UniformGrid Grid.Row="1"
+                                         Rows="3"
+                                         Columns="3">
+                                <Button Content="开启"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding SystemIsRunning}"
+                                        Command="{Binding StartSystemCommand}"/>
+                                <Button Content="停止"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding SystemIsStopped}"
+                                        Command="{Binding StopSystemCommand}"/>
+                                <Button Content="复位"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Command="{Binding ResetSystemCommand}"/>
+                                <Button Content="自动"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding AutomaticModeIsSelected}"
+                                        Command="{Binding SelectAutomaticModeCommand}"/>
+                                <Button Content="半自动"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding SemiAutomaticModeIsSelected}"
+                                        Command="{Binding SelectSemiAutomaticModeCommand}"/>
+                                <Button Content="手动"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding ManualModeIsSelected}"
+                                        Command="{Binding SelectManualModeCommand}"/>
+                                <Button Content="抽真空"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding VacuumingIsSelected}"
+                                        Command="{Binding StartVacuumCommand}"/>
+                                <Button Content="破真空"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding VentingIsSelected}"
+                                        Command="{Binding BreakVacuumCommand}"/>
+                                <Button Content="保压"
+                                        Style="{StaticResource SystemControlButtonStyle}"
+                                        Tag="{Binding PressureHoldingIsSelected}"
+                                        Command="{Binding HoldPressureCommand}"/>
+                            </UniformGrid>
+                        </Grid>
+                    </Border>
+
                     <!-- 设备控件演示：使用右侧预留区域，不进入左侧设备画布。 -->
                     <Border Width="567"
                             Height="652"
@@ -545,58 +612,25 @@
                                 SetpointCommand="{Binding SetPower2Command}"/>
 
                             <Grid Grid.Row="3"
-                                  Height="118"
+                                  Height="146"
                                   Margin="0,0,0,2"
                                   VerticalAlignment="Bottom">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="300"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
                                 <controls:SampleStageSpeedControl
                                     DisplayName="样品台转速"
                                     CurrentSpeed="{Binding SampleStageCurrentSpeed}"
                                     SetpointSpeed="{Binding SampleStageSetpointSpeed}"
+                                    IsForwardRunning="{Binding SampleStageIsForwardRunning}"
+                                    IsReverseRunning="{Binding SampleStageIsReverseRunning}"
                                     Unit="rpm"
-                                    SetpointCommand="{Binding SetSampleStageSpeedCommand}"/>
-
-                                <Border Grid.Column="2"
-                                        Padding="10,8"
-                                        Background="#F8FAFC"
-                                        BorderBrush="#AEBCC8"
-                                        BorderThickness="1.5"
-                                        CornerRadius="7">
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="冷水机"
-                                                   Margin="0,0,0,10"
-                                                   FontSize="18"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#1F2D3D"
-                                                   TextAlignment="Center"/>
-                                        <controls:ShutterSwitchButton
-                                            Width="122"
-                                            Height="44"
-                                            HorizontalAlignment="Center"
-                                            DeviceName="冷水机"
-                                            IsOn="{Binding ChillerIsOn}"
-                                            IsInterlockReleased="{Binding ChillerInterlockReleased}"
-                                            Command="{Binding ToggleChillerCommand}"/>
-                                    </StackPanel>
-                                </Border>
+                                    SetpointCommand="{Binding SetSampleStageSpeedCommand}"
+                                    ForwardCommand="{Binding StartSampleStageForwardCommand}"
+                                    ReverseCommand="{Binding StartSampleStageReverseCommand}"/>
                             </Grid>
                         </Grid>
                     </Border>
                 </Grid>
             </Viewbox>
-        </Border>
-
-        <Border Grid.Row="2"
-                    Margin="0,14,0,0"
-                    Padding="14,10"
-                    Background="#E5F1FB"
-                    BorderBrush="#B7D7F0"
-                    BorderThickness="1"
-                    CornerRadius="6"/>
-    </Grid>
+            </Border>
+        </controls:HmiPageLayout.PageContent>
+    </controls:HmiPageLayout>
 </Page>

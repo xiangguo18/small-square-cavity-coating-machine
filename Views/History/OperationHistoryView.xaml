@@ -1,0 +1,60 @@
+<UserControl x:Class="Small_square_cavity_coating_machine.Views.HistoryModules.OperationHistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="580"
+             d:DesignWidth="1000">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,10" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="开始时间"/>
+            <DatePicker Style="{StaticResource HistoryDatePickerStyle}"
+                        SelectedDate="{Binding StartDate}"/>
+            <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
+                     Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="结束时间"/>
+            <DatePicker Style="{StaticResource HistoryDatePickerStyle}"
+                        SelectedDate="{Binding EndDate}"/>
+            <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
+                     Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}"/>
+            <Button Width="82" Height="32" Margin="0,0,8,0"
+                    Content="查询" Command="{Binding QueryCoreCommand}"/>
+            <Button Width="90" Height="32"
+                    Content="重置时间" Command="{Binding ClearFiltersCommand}"/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True"
+                  ItemsSource="{Binding Records}"
+                  HeadersVisibility="Column"
+                  RowHeaderWidth="0"
+                  EnableRowVirtualization="True"
+                  GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+                <DataGridTextColumn Width="185" Header="操作时间"
+                                    Binding="{Binding Timestamp, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
+                <DataGridTextColumn Width="100" Header="用户" Binding="{Binding UserName}"/>
+                <DataGridTextColumn Width="130" Header="设备/对象" Binding="{Binding Target}"/>
+                <DataGridTextColumn Width="*" MinWidth="180" Header="操作内容" Binding="{Binding Action}"/>
+                <DataGridTextColumn Width="110" Header="设定值" Binding="{Binding SetValue}"/>
+                <DataGridTextColumn Width="75" Header="结果" Binding="{Binding ResultText}"/>
+                <DataGridTextColumn Width="75" Header="报警" Binding="{Binding AlarmText}"/>
+                <DataGridTextColumn Width="160" Header="失败原因" Binding="{Binding FailureReason}"/>
+                <DataGridTextColumn Width="70" Header="来源" Binding="{Binding DataSourceText}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="2" Margin="2,8,0,0"
+                   Foreground="#607D8B" Text="{Binding StatusMessage}"/>
+    </Grid>
+</UserControl>

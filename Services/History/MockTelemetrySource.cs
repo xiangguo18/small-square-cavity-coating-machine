@@ -1,0 +1,78 @@
+using Small_square_cavity_coating_machine.Models.History;
+
+namespace Small_square_cavity_coating_machine.Services.History;
+
+/// <summary>
+/// 离线界面开发使用的确定性模拟数据源，不包含任何安全阈值判断。
+/// </summary>
+public sealed class MockTelemetrySource : ITelemetrySource
+{
+    private readonly string _sessionId = Guid.NewGuid().ToString("N");
+    private readonly TimeSpan _samplingInterval;
+    private Task? _samplingTask;
+    private int _sampleIndex;
+
+    public MockTelemetrySource(TimeSpan samplingInterval)
+    {
+        _samplingInterval = samplingInterval;
+    }
+
+    public event EventHandler<TelemetrySample>? SampleReceived;
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (_samplingTask is null)
+        {
+            _samplingTask = RunAsync(cancellationToken);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_samplingTask is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _samplingTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task RunAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(_samplingInterval);
+
+        PublishSample();
+        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+        {
+            PublishSample();
+        }
+    }
+
+    private void PublishSample()
+    {
+        var phase = _sampleIndex++ / 18d;
+        var sample = new TelemetrySample(
+            DateTimeOffset.Now,
+            _sessionId,
+            string.Empty,
+            string.Empty,
+            13.6 + Math.Sin(phase) * 0.65,
+            12.9 + Math.Sin(phase * 0.82 + 0.7) * 0.52,
+            480 + Math.Sin(phase * 1.1) * 7.5,
+            1.8 + Math.Sin(phase * 1.15 + 0.4) * 0.12,
+            472 + Math.Sin(phase * 0.92 + 1.2) * 6.2,
+            1.65 + Math.Sin(phase * 0.88 + 0.9) * 0.1,
+            186.5 + Math.Sin(phase * 0.28) * 4.8,
+            "Simulation");
+
+        SampleReceived?.Invoke(this, sample);
+    }
+}

@@ -1,4 +1,5 @@
-﻿using Small_square_cavity_coating_machine.Views;
+using Small_square_cavity_coating_machine.Views;
+using Small_square_cavity_coating_machine.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -20,15 +21,22 @@ namespace Small_square_cavity_coating_machine.Views
     public partial class MainView : Window
     {
         // 提前创建六个页面对象
-        private readonly IO _ioPage = new();
-        private readonly Parameter _parameterPage = new();
-        private readonly Controlview _controlmPage = new();
-        private readonly Process _processPage = new();
-        private readonly History _historyPage = new();
-        private readonly User _userPage = new();
+        private readonly IO _ioPage;
+        private readonly Parameter _parameterPage;
+        private readonly Controlview _controlmPage;
+        private readonly Process _processPage;
+        private readonly History _historyPage;
+        private readonly User _userPage;
 
-        public MainView()
+        public MainView(ApplicationServices services)
         {
+            _ioPage = new IO();
+            _parameterPage = new Parameter();
+            _controlmPage = new Controlview(services.ControlViewModel);
+            _processPage = new Process();
+            _historyPage = new History(services.HistoryViewModel);
+            _userPage = new User();
+
             InitializeComponent();
 
             // 程序启动时默认显示 I/O 页面

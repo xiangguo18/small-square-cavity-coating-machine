@@ -52,6 +52,34 @@ public partial class SampleStageSpeedControl : UserControl
             typeof(SampleStageSpeedControl),
             new FrameworkPropertyMetadata(null));
 
+    public static readonly DependencyProperty IsForwardRunningProperty =
+        DependencyProperty.Register(
+            nameof(IsForwardRunning),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsReverseRunningProperty =
+        DependencyProperty.Register(
+            nameof(IsReverseRunning),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty ForwardCommandProperty =
+        DependencyProperty.Register(
+            nameof(ForwardCommand),
+            typeof(ICommand),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(null));
+
+    public static readonly DependencyProperty ReverseCommandProperty =
+        DependencyProperty.Register(
+            nameof(ReverseCommand),
+            typeof(ICommand),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(null));
+
     public string DisplayName
     {
         get => (string)GetValue(DisplayNameProperty);
@@ -80,6 +108,30 @@ public partial class SampleStageSpeedControl : UserControl
     {
         get => (ICommand?)GetValue(SetpointCommandProperty);
         set => SetValue(SetpointCommandProperty, value);
+    }
+
+    public bool IsForwardRunning
+    {
+        get => (bool)GetValue(IsForwardRunningProperty);
+        set => SetValue(IsForwardRunningProperty, value);
+    }
+
+    public bool IsReverseRunning
+    {
+        get => (bool)GetValue(IsReverseRunningProperty);
+        set => SetValue(IsReverseRunningProperty, value);
+    }
+
+    public ICommand? ForwardCommand
+    {
+        get => (ICommand?)GetValue(ForwardCommandProperty);
+        set => SetValue(ForwardCommandProperty, value);
+    }
+
+    public ICommand? ReverseCommand
+    {
+        get => (ICommand?)GetValue(ReverseCommandProperty);
+        set => SetValue(ReverseCommandProperty, value);
     }
 
     private void SetpointTextBox_PreviewKeyDown(object sender, KeyEventArgs e)

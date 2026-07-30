@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Small_square_cavity_coating_machine.Models.History;
+using Small_square_cavity_coating_machine.Services.History;
 
 namespace Small_square_cavity_coating_machine.ViewModels;
 
@@ -9,6 +11,17 @@ namespace Small_square_cavity_coating_machine.ViewModels;
 /// </summary>
 public partial class ControlViewModel : ObservableObject
 {
+    private readonly IOperationLogRepository? _operationLogRepository;
+
+    public ControlViewModel()
+    {
+    }
+
+    public ControlViewModel(IOperationLogRepository operationLogRepository)
+    {
+        _operationLogRepository = operationLogRepository;
+    }
+
     [ObservableProperty]
     private bool argonUpperValveIsOpen;
 
@@ -124,10 +137,34 @@ public partial class ControlViewModel : ObservableObject
     private double sampleStageSetpointSpeed = 15d;
 
     [ObservableProperty]
-    private bool chillerIsOn;
+    private bool sampleStageIsForwardRunning;
 
     [ObservableProperty]
-    private bool chillerInterlockReleased = true;
+    private bool sampleStageIsReverseRunning;
+
+    [ObservableProperty]
+    private bool systemIsRunning;
+
+    [ObservableProperty]
+    private bool systemIsStopped = true;
+
+    [ObservableProperty]
+    private bool automaticModeIsSelected;
+
+    [ObservableProperty]
+    private bool semiAutomaticModeIsSelected;
+
+    [ObservableProperty]
+    private bool manualModeIsSelected = true;
+
+    [ObservableProperty]
+    private bool vacuumingIsSelected;
+
+    [ObservableProperty]
+    private bool ventingIsSelected;
+
+    [ObservableProperty]
+    private bool pressureHoldingIsSelected;
 
     [ObservableProperty]
     private double heaterCurrentTemperature = 186.5;
@@ -202,155 +239,290 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleArgonUpperValve()
     {
         ArgonUpperValveIsOpen = !ArgonUpperValveIsOpen;
+        LogOperation("Ar前级阀（上）", ArgonUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleArgonLowerValve()
     {
         ArgonLowerValveIsOpen = !ArgonLowerValveIsOpen;
+        LogOperation("Ar前级阀（下）", ArgonLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleNitrogenUpperValve()
     {
         NitrogenUpperValveIsOpen = !NitrogenUpperValveIsOpen;
+        LogOperation("N₂前级阀（上）", NitrogenUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleNitrogenLowerValve()
     {
         NitrogenLowerValveIsOpen = !NitrogenLowerValveIsOpen;
+        LogOperation("N₂前级阀（下）", NitrogenLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleOxygenUpperValve()
     {
         OxygenUpperValveIsOpen = !OxygenUpperValveIsOpen;
+        LogOperation("O₂前级阀（上）", OxygenUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleOxygenLowerValve()
     {
         OxygenLowerValveIsOpen = !OxygenLowerValveIsOpen;
+        LogOperation("O₂前级阀（下）", OxygenLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleBypassValve()
     {
         BypassValveIsOpen = !BypassValveIsOpen;
+        LogOperation("旁抽阀", BypassValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleRightForelineValve()
     {
         RightForelineValveIsOpen = !RightForelineValveIsOpen;
+        LogOperation("右侧前级阀", RightForelineValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleLowerForelineValve()
     {
         LowerForelineValveIsOpen = !LowerForelineValveIsOpen;
+        LogOperation("下部前级阀", LowerForelineValveIsOpen ? "打开阀门" : "关闭阀门");
     }
 
     [RelayCommand]
     private void ToggleTurboPump()
     {
         TurboPumpIsRunning = !TurboPumpIsRunning;
+        LogOperation("分子泵", TurboPumpIsRunning ? "启动" : "停止");
     }
 
     [RelayCommand]
     private void ToggleDryPump()
     {
         DryPumpIsRunning = !DryPumpIsRunning;
+        LogOperation("干泵", DryPumpIsRunning ? "启动" : "停止");
     }
 
     [RelayCommand]
     private void ToggleFilmGauge()
     {
         FilmGaugeIsReadingEnabled = !FilmGaugeIsReadingEnabled;
+        LogOperation("薄膜高真空度计", FilmGaugeIsReadingEnabled ? "启用读数" : "停止读数");
     }
 
     [RelayCommand]
     private void SetSampleStageSpeed(double value)
     {
         SampleStageSetpointSpeed = value;
+        LogOperation("样品台", "设置转速", $"{value:0.###} rpm");
     }
 
     [RelayCommand]
-    private void ToggleChiller()
+    private void StartSampleStageForward()
     {
-        ChillerIsOn = !ChillerIsOn;
+        SampleStageIsForwardRunning = true;
+        SampleStageIsReverseRunning = false;
+        LogOperation("样品台", "启动正转", $"{SampleStageSetpointSpeed:0.###} rpm");
+    }
+
+    [RelayCommand]
+    private void StartSampleStageReverse()
+    {
+        SampleStageIsForwardRunning = false;
+        SampleStageIsReverseRunning = true;
+        LogOperation("样品台", "启动反转", $"{SampleStageSetpointSpeed:0.###} rpm");
+    }
+
+    [RelayCommand]
+    private void StartSystem()
+    {
+        SystemIsRunning = true;
+        SystemIsStopped = false;
+        LogOperation("系统控制", "开启");
+    }
+
+    [RelayCommand]
+    private void StopSystem()
+    {
+        SystemIsRunning = false;
+        SystemIsStopped = true;
+        LogOperation("系统控制", "停止");
+    }
+
+    [RelayCommand]
+    private void ResetSystem()
+    {
+        SystemIsRunning = false;
+        SystemIsStopped = true;
+        AutomaticModeIsSelected = false;
+        SemiAutomaticModeIsSelected = false;
+        ManualModeIsSelected = true;
+        VacuumingIsSelected = false;
+        VentingIsSelected = false;
+        PressureHoldingIsSelected = false;
+        SampleStageIsForwardRunning = false;
+        SampleStageIsReverseRunning = false;
+        LogOperation("系统控制", "复位");
+    }
+
+    [RelayCommand]
+    private void SelectAutomaticMode()
+    {
+        AutomaticModeIsSelected = true;
+        SemiAutomaticModeIsSelected = false;
+        ManualModeIsSelected = false;
+        LogOperation("系统控制", "切换模式", "自动");
+    }
+
+    [RelayCommand]
+    private void SelectSemiAutomaticMode()
+    {
+        AutomaticModeIsSelected = false;
+        SemiAutomaticModeIsSelected = true;
+        ManualModeIsSelected = false;
+        LogOperation("系统控制", "切换模式", "半自动");
+    }
+
+    [RelayCommand]
+    private void SelectManualMode()
+    {
+        AutomaticModeIsSelected = false;
+        SemiAutomaticModeIsSelected = false;
+        ManualModeIsSelected = true;
+        LogOperation("系统控制", "切换模式", "手动");
+    }
+
+    [RelayCommand]
+    private void StartVacuum()
+    {
+        VacuumingIsSelected = true;
+        VentingIsSelected = false;
+        PressureHoldingIsSelected = false;
+        LogOperation("系统控制", "抽真空");
+    }
+
+    [RelayCommand]
+    private void BreakVacuum()
+    {
+        VacuumingIsSelected = false;
+        VentingIsSelected = true;
+        PressureHoldingIsSelected = false;
+        LogOperation("系统控制", "破真空");
+    }
+
+    [RelayCommand]
+    private void HoldPressure()
+    {
+        VacuumingIsSelected = false;
+        VentingIsSelected = false;
+        PressureHoldingIsSelected = true;
+        LogOperation("系统控制", "保压");
     }
 
     [RelayCommand]
     private void ToggleSampleShutter()
     {
         SampleShutterIsOn = !SampleShutterIsOn;
+        LogOperation("样品挡板", SampleShutterIsOn ? "打开" : "关闭");
     }
 
     [RelayCommand]
     private void ToggleTarget1Shutter()
     {
         Target1ShutterIsOn = !Target1ShutterIsOn;
+        LogOperation("靶1挡板", Target1ShutterIsOn ? "打开" : "关闭");
     }
 
     [RelayCommand]
     private void ToggleTarget2Shutter()
     {
         Target2ShutterIsOn = !Target2ShutterIsOn;
+        LogOperation("靶2挡板", Target2ShutterIsOn ? "打开" : "关闭");
     }
 
     [RelayCommand]
     private void ToggleHeater()
     {
         HeaterIsRunning = !HeaterIsRunning;
+        LogOperation("加热", HeaterIsRunning ? "启动" : "停止");
     }
 
     [RelayCommand]
     private void SetHeaterTemperature(double value)
     {
         HeaterSetpointTemperature = value;
+        LogOperation("加热", "设置目标温度", $"{value:0.###} ℃");
     }
 
     [RelayCommand]
     private void TogglePower1()
     {
         Power1IsRunning = !Power1IsRunning;
+        LogOperation("电源1", Power1IsRunning ? "启动" : "停止");
     }
 
     [RelayCommand]
     private void SetPower1(double value)
     {
         Power1Setpoint = value;
+        LogOperation("电源1", "设置功率", $"{value:0.###} W");
     }
 
     [RelayCommand]
     private void TogglePower2()
     {
         Power2IsRunning = !Power2IsRunning;
+        LogOperation("电源2", Power2IsRunning ? "启动" : "停止");
     }
 
     [RelayCommand]
     private void SetPower2(double value)
     {
         Power2Setpoint = value;
+        LogOperation("电源2", "设置功率", $"{value:0.###} W");
     }
 
     [RelayCommand]
     private void ToggleApcMode()
     {
         ApcIsPositioningMode = !ApcIsPositioningMode;
+        LogOperation("APC阀", "切换控制模式", ApcIsPositioningMode ? "定位模式" : "控压模式");
     }
 
     [RelayCommand]
     private void SetApcPosition(double value)
     {
         ApcPositionSetpoint = value;
+        LogOperation("APC阀", "设置位置", $"{value:0.###} %");
     }
 
     [RelayCommand]
     private void SetApcPressure(double value)
     {
         ApcPressureSetpoint = value;
+        LogOperation("APC阀", "设置压力", $"{value:0.###} Pa");
+    }
+
+    private void LogOperation(string target, string action, string setValue = "")
+    {
+        _operationLogRepository?.Add(new OperationLogRecord(
+            DateTimeOffset.Now,
+            "本地模拟用户",
+            target,
+            action,
+            setValue,
+            true,
+            false,
+            string.Empty,
+            true));
     }
 }

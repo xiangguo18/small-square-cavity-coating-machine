@@ -1,3 +1,4 @@
+using Small_square_cavity_coating_machine.ViewModels;
 using System.Windows.Controls;
 
 namespace Small_square_cavity_coating_machine.Views
@@ -10,6 +11,12 @@ namespace Small_square_cavity_coating_machine.Views
         public Controlview()
         {
             InitializeComponent();
+        }
+
+        public Controlview(ControlViewModel viewModel)
+            : this()
+        {
+            DataContext = viewModel;
         }
 
     }
