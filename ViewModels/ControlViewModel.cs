@@ -23,79 +23,106 @@ public partial class ControlViewModel : ObservableObject
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ArgonMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ArgonValvePairPipeIsFlowing))]
     private bool argonUpperValveIsOpen;
 
     [ObservableProperty]
     private bool argonUpperValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ArgonValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ArgonMfcPipeIsFlowing))]
     private bool argonLowerValveIsOpen;
 
     [ObservableProperty]
     private bool argonLowerValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(NitrogenMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(NitrogenValvePairPipeIsFlowing))]
     private bool nitrogenUpperValveIsOpen;
 
     [ObservableProperty]
     private bool nitrogenUpperValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NitrogenValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(NitrogenMfcPipeIsFlowing))]
     private bool nitrogenLowerValveIsOpen;
 
     [ObservableProperty]
     private bool nitrogenLowerValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(OxygenMixingPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(OxygenValvePairPipeIsFlowing))]
     private bool oxygenUpperValveIsOpen;
 
     [ObservableProperty]
     private bool oxygenUpperValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OxygenValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(OxygenMfcPipeIsFlowing))]
     private bool oxygenLowerValveIsOpen;
 
     [ObservableProperty]
     private bool oxygenLowerValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToBypassPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(BypassToDryPumpPipeIsFlowing))]
     private bool bypassValveIsOpen;
 
     [ObservableProperty]
     private bool bypassValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TurboToRightForelinePipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(RightForelineToDryPumpPipeIsFlowing))]
     private bool rightForelineValveIsOpen;
 
     [ObservableProperty]
     private bool rightForelineValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToLowerForelinePipeIsFlowing))]
     private bool lowerForelineValveIsOpen;
 
     [ObservableProperty]
     private bool lowerForelineValveInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ApcToTurboPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(TurboToRightForelinePipeIsFlowing))]
     private bool turboPumpIsRunning;
 
     [ObservableProperty]
     private bool turboPumpInterlockReleased = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RightForelineToDryPumpPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(BypassToDryPumpPipeIsFlowing))]
     private bool dryPumpIsRunning;
 
     [ObservableProperty]
     private bool dryPumpInterlockReleased = true;
 
     [ObservableProperty]
-    private bool vacuumPathIsFlowing = true;
-
-    [ObservableProperty]
-    private bool branchPathIsFlowing = true;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ArgonMfcPipeIsFlowing))]
     private double argonCurrentFlow = 0.6;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NitrogenMfcPipeIsFlowing))]
+    private double nitrogenCurrentFlow = 0.6;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OxygenMfcPipeIsFlowing))]
+    private double oxygenCurrentFlow = 0.6;
 
     [ObservableProperty]
     private double argonSetpointFlow = 1.0;
@@ -218,6 +245,8 @@ public partial class ControlViewModel : ObservableObject
     private bool apcIsPositioningMode = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToApcPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ApcToTurboPipeIsFlowing))]
     private double apcCurrentPosition = 45d;
 
     [ObservableProperty]
@@ -234,6 +263,56 @@ public partial class ControlViewModel : ObservableObject
 
     [ObservableProperty]
     private bool apcInterlockReleased = true;
+
+    public bool ChamberToApcPipeIsFlowing => IsPositiveFinite(ApcCurrentPosition);
+
+    public bool ApcToTurboPipeIsFlowing =>
+        ChamberToApcPipeIsFlowing && TurboPumpIsRunning;
+
+    public bool TurboToRightForelinePipeIsFlowing =>
+        TurboPumpIsRunning && RightForelineValveIsOpen;
+
+    public bool RightForelineToDryPumpPipeIsFlowing =>
+        RightForelineValveIsOpen && DryPumpIsRunning;
+
+    public bool ChamberToBypassPipeIsFlowing => BypassValveIsOpen;
+
+    public bool BypassToDryPumpPipeIsFlowing =>
+        BypassValveIsOpen && DryPumpIsRunning;
+
+    public bool ChamberToLowerForelinePipeIsFlowing => LowerForelineValveIsOpen;
+
+    public bool ChamberToMixingPipeIsFlowing =>
+        ArgonUpperValveIsOpen
+        || NitrogenUpperValveIsOpen
+        || OxygenUpperValveIsOpen;
+
+    public bool ArgonMixingPipeIsFlowing => ArgonUpperValveIsOpen;
+
+    public bool ArgonValvePairPipeIsFlowing =>
+        ArgonUpperValveIsOpen && ArgonLowerValveIsOpen;
+
+    public bool ArgonMfcPipeIsFlowing =>
+        ArgonLowerValveIsOpen && IsPositiveFinite(ArgonCurrentFlow);
+
+    public bool NitrogenMixingPipeIsFlowing => NitrogenUpperValveIsOpen;
+
+    public bool NitrogenValvePairPipeIsFlowing =>
+        NitrogenUpperValveIsOpen && NitrogenLowerValveIsOpen;
+
+    public bool NitrogenMfcPipeIsFlowing =>
+        NitrogenLowerValveIsOpen && IsPositiveFinite(NitrogenCurrentFlow);
+
+    public bool OxygenMixingPipeIsFlowing => OxygenUpperValveIsOpen;
+
+    public bool OxygenValvePairPipeIsFlowing =>
+        OxygenUpperValveIsOpen && OxygenLowerValveIsOpen;
+
+    public bool OxygenMfcPipeIsFlowing =>
+        OxygenLowerValveIsOpen && IsPositiveFinite(OxygenCurrentFlow);
+
+    private static bool IsPositiveFinite(double value) =>
+        double.IsFinite(value) && value > 0d;
 
     [RelayCommand]
     private void ToggleArgonUpperValve()

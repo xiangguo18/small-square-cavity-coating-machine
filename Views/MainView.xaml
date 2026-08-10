@@ -8,11 +8,18 @@
         Title="小方腔体磁控溅射镀膜机" Height="750" Width="1200">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="80"/>
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
 
-        <Grid x:Name="gridMenu1" Grid.Column="0" Width="80" Background="LightBlue">
+        <Grid x:Name="gridMenu1"
+              Grid.Column="0"
+              Grid.ColumnSpan="2"
+              Width="80"
+              HorizontalAlignment="Left"
+              Panel.ZIndex="1"
+              ClipToBounds="True"
+              Background="LightBlue">
             <Grid.RowDefinitions>
                 <RowDefinition Height="60"/>
                 <RowDefinition Height="60"/>
@@ -36,37 +43,16 @@
 
 
             <!-- 折叠状态栏按钮 -->
-            <ToggleButton Grid.Row="1" 
+            <ToggleButton x:Name="MenuToggleButton"
+                          Grid.Row="1"
                           Content="&#xF039;" 
                           FontSize="30" 
                           FontFamily="Font Awesome 5 Free Solid" 
                           Background="LightBlue"
                           BorderThickness="0"
-                          BorderBrush="Transparent">
-                <ToggleButton.Triggers>
-                    <EventTrigger RoutedEvent="ToggleButton.Unchecked">
-                        <BeginStoryboard>
-                            <Storyboard x:Name="closeMenu">
-                                <DoubleAnimation Storyboard.TargetName="gridMenu1" 
-                                                 Storyboard.TargetProperty="Width" From="260" To="80"
-                                                 Duration="0:0:0.5">
-                                </DoubleAnimation>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-
-                    <EventTrigger RoutedEvent="ToggleButton.Checked">
-                        <BeginStoryboard>
-                            <Storyboard x:Name="showMenu">
-                                <DoubleAnimation Storyboard.TargetName="gridMenu1" 
-                                                 Storyboard.TargetProperty="Width" From="60" To="260"
-                                                 Duration="0:0:0.5">
-                                </DoubleAnimation>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </ToggleButton.Triggers>   
-            </ToggleButton>
+                          BorderBrush="Transparent"
+                          Checked="MenuToggleButton_Checked"
+                          Unchecked="MenuToggleButton_Unchecked"/>
 
             <!-- 功能菜单栏 -->
             <StackPanel Grid.Row="2" Background="lightBlue">
@@ -292,6 +278,9 @@
 
         </Grid>
 
-        <Frame Grid.Column="1" x:Name="PageNavigation" NavigationUIVisibility="Hidden"/>
+        <Frame Grid.Column="1"
+               x:Name="PageNavigation"
+               Panel.ZIndex="0"
+               NavigationUIVisibility="Hidden"/>
     </Grid>
 </Window>

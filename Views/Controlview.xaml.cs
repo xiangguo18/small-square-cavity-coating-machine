@@ -19,5 +19,9 @@ namespace Small_square_cavity_coating_machine.Views
             DataContext = viewModel;
         }
 
+        private void ValveControl_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+
+        }
     }
 }

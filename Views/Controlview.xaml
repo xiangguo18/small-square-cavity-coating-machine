@@ -82,7 +82,7 @@
                         <controls:StraightPipeControl
                         Canvas.Left="553" Canvas.Top="129"
                         Width="47" Height="24"
-                        IsFlowing="{Binding BranchPathIsFlowing}"
+                        IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
                         FlowAnimationDirection="Forward"
                         AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 
@@ -111,7 +111,7 @@
                             Canvas.Left="748" Canvas.Top="214"
                             Width="24" Height="37"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding RightForelineToDryPumpPipeIsFlowing}"
                             FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         <!-- 腔体与真空度计 -->
 
@@ -119,60 +119,60 @@
                             Canvas.Left="68" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding ArgonMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="223" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding NitrogenMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <controls:StraightPipeControl
                             Canvas.Left="378" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding OxygenMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <controls:StraightPipeControl
                             Canvas.Left="378" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding OxygenValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="223" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding NitrogenValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="68" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding ArgonValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <!-- 腔体与真空度计 -->
                         <controls:ElbowPipeControl Canvas.Left="30" Canvas.Top="345"
                             Width="100" Height="100"
                             Orientation="BottomRight"
-                            IsFlowing="True"
+                            IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:ElbowPipeControl Canvas.Left="340" Canvas.Top="345"
                             Width="100" Height="100"
                             Orientation="BottomLeft"
-                            IsFlowing="True"
+                            IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="222" Canvas.Top="404"
                             Width="24" Height="30"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding NitrogenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="222" Canvas.Top="349"
                             Width="24" Height="30"
                             Orientation="Vertical"
-                            IsFlowing="{Binding BranchPathIsFlowing}"
+                            IsFlowing="{Binding ChamberToMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
                         <controls:VacuumGaugeControl
@@ -204,7 +204,7 @@
                         <controls:ElbowPipeControl Canvas.Left="423" Canvas.Top="276"
                             Width="101" Height="100"
                             Orientation="BottomLeft"
-                            IsFlowing="True"
+                            IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <Rectangle Canvas.Left="46" Canvas.Top="107"
                                Width="379" Height="247"
@@ -227,7 +227,7 @@
                             Orientation="Vertical"
                             IsOpen="{Binding ArgonUpperValveIsOpen}"
                             IsInterlockReleased="{Binding ArgonUpperValveInterlockReleased}"
-                            Command="{Binding ToggleArgonUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                            Command="{Binding ToggleArgonUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top" Click="ValveControl_Click"/>
                         <controls:ValveControl
                             Canvas.Left="180" Canvas.Top="414"
                             Width="110" Height="100"
@@ -275,7 +275,7 @@
                         Canvas.Left="305" Canvas.Top="577"
                         Width="170" Height="80"
                         DisplayName="MFC · O2"
-                        CurrentFlow="{Binding ArgonCurrentFlow}"
+                        CurrentFlow="{Binding OxygenCurrentFlow}"
                         SetpointFlow="{Binding ArgonSetpointFlow}"
                         Unit="sccm"
                         ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
@@ -284,26 +284,26 @@
                         <controls:StraightPipeControl
                         Canvas.Left="425" Canvas.Top="246"
                         Width="82" Height="24"
-                        IsFlowing="{Binding VacuumPathIsFlowing}"
+                        IsFlowing="{Binding ChamberToBypassPipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
                         <!-- 四种弯头方向，用于在设计器中复制 -->
                         <controls:StraightPipeControl
                         Canvas.Left="425" Canvas.Top="130"
                         Width="82" Height="24"
-                        IsFlowing="{Binding BranchPathIsFlowing}"
+                        IsFlowing="{Binding ChamberToApcPipeIsFlowing}"
                         FlowAnimationDirection="Forward"
                         AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                         <controls:ElbowPipeControl Canvas.Left="710" Canvas.Top="91"
                         Width="100" Height="100"
                         Orientation="BottomLeft"
-                        IsFlowing="True"
+                        IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
                         FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:MfcFlowMeterControl
                         Canvas.Left="150" Canvas.Top="577"
                         Width="170" Height="80"
                         DisplayName="MFC · N2"
-                        CurrentFlow="{Binding ArgonCurrentFlow}"
+                        CurrentFlow="{Binding NitrogenCurrentFlow}"
                         SetpointFlow="{Binding ArgonSetpointFlow}"
                         Unit="sccm"
                         ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -318,12 +318,12 @@
                         Canvas.Left="461" Canvas.Top="408"
                         Width="24" Height="37"
                         Orientation="Vertical"
-                        IsFlowing="{Binding BranchPathIsFlowing}"
+                        IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                         Canvas.Left="658" Canvas.Top="129"
                         Width="52" Height="24"
-                        IsFlowing="{Binding VacuumPathIsFlowing}"
+                        IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.653,-3.247"/>
                         <controls:TurbomolecularPumpControl
                         Canvas.Left="578" Canvas.Top="99"
@@ -348,17 +348,17 @@
                         <controls:StraightPipeControl
                             Canvas.Left="130" Canvas.Top="383"
                             Width="55" Height="24"
-                            IsFlowing="{Binding VacuumPathIsFlowing}"
+                            IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                         <controls:StraightPipeControl
                             Canvas.Left="283" Canvas.Top="383"
                             Width="57" Height="24"
-                            IsFlowing="{Binding VacuumPathIsFlowing}"
+                            IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <controls:StraightPipeControl
                             Canvas.Left="557" Canvas.Top="246"
                             Width="196" Height="24"
-                            IsFlowing="{Binding VacuumPathIsFlowing}"
+                            IsFlowing="{Binding BypassToDryPumpPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         <Rectangle Canvas.Left="185" Canvas.Top="372" Width="99" Height="46" RadiusX="12" RadiusY="12"
                                Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="3" HorizontalAlignment="Center" VerticalAlignment="Top" RenderTransformOrigin="0.484,0.322" />
