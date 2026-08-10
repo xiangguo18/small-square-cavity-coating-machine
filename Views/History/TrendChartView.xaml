@@ -143,21 +143,42 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Text="模拟数据模式"
+            <TextBlock Text="模拟数据模式（1秒 = 1分钟）"
                        VerticalAlignment="Center"
                        FontWeight="SemiBold"
                        Foreground="#8A5800"/>
         </Border>
 
-        <Button MinWidth="100"
-                Height="34"
-                Padding="18,4"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Panel.ZIndex="2"
-                Content="{Binding ActionText}"
-                Command="{Binding ActionCommand}"
-                FontSize="15"
-                FontWeight="SemiBold"/>
+        <StackPanel HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Orientation="Horizontal"
+                    Panel.ZIndex="2">
+            <Button MinWidth="100"
+                    Height="34"
+                    Margin="0,0,8,0"
+                    Padding="18,4"
+                    Content="自动化显示"
+                    Command="{Binding ResumeLiveFollowCommand}"
+                    FontSize="15"
+                    FontWeight="SemiBold">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsAutomaticDisplayAvailable}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button MinWidth="100"
+                    Height="34"
+                    Padding="18,4"
+                    Content="{Binding ActionText}"
+                    Command="{Binding ActionCommand}"
+                    FontSize="15"
+                    FontWeight="SemiBold"/>
+        </StackPanel>
     </Grid>
 </UserControl>

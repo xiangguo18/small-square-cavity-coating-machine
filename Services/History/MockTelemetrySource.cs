@@ -9,12 +9,29 @@ public sealed class MockTelemetrySource : ITelemetrySource
 {
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private readonly TimeSpan _samplingInterval;
+    private readonly TimeSpan _simulatedTimeStep;
+    private readonly DateTimeOffset _simulationStart;
     private Task? _samplingTask;
     private int _sampleIndex;
 
-    public MockTelemetrySource(TimeSpan samplingInterval)
+    public MockTelemetrySource(
+        TimeSpan samplingInterval,
+        TimeSpan? simulatedTimeStep = null)
     {
+        if (samplingInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(samplingInterval));
+        }
+
+        var timeStep = simulatedTimeStep ?? samplingInterval;
+        if (timeStep <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(simulatedTimeStep));
+        }
+
         _samplingInterval = samplingInterval;
+        _simulatedTimeStep = timeStep;
+        _simulationStart = DateTimeOffset.Now;
     }
 
     public event EventHandler<TelemetrySample>? SampleReceived;
@@ -58,9 +75,11 @@ public sealed class MockTelemetrySource : ITelemetrySource
 
     private void PublishSample()
     {
-        var phase = _sampleIndex++ / 18d;
+        var sampleIndex = _sampleIndex++;
+        var phase = sampleIndex / 18d;
+        var simulatedTimestamp = _simulationStart.AddTicks(_simulatedTimeStep.Ticks * sampleIndex);
         var sample = new TelemetrySample(
-            DateTimeOffset.Now,
+            simulatedTimestamp,
             _sessionId,
             string.Empty,
             string.Empty,

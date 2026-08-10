@@ -65,7 +65,9 @@ public sealed class ApplicationServices : IDisposable
             operationHistory,
             alarmHistory);
 
-        _telemetrySource = new MockTelemetrySource(TimeSpan.FromSeconds(1));
+        _telemetrySource = new MockTelemetrySource(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromMinutes(1));
         _telemetrySource.SampleReceived += (_, sample) => SessionTrendStore.Append(sample);
     }
 

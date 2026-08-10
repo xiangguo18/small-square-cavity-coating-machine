@@ -23,6 +23,7 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private const string TemperatureAxisKey = "Temperature";
 
     private static readonly TimeSpan LiveWindow = TimeSpan.FromMinutes(30);
+    private static readonly double LiveRightMargin = LiveWindow.TotalDays * 0.02d;
     private readonly Dispatcher _dispatcher;
     private readonly bool _isLive;
     private readonly DateTimeAxis _highVacuumTimeAxis;
@@ -36,6 +37,8 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private readonly LineSeries _power2VoltageSeries;
     private readonly LineSeries _power2CurrentSeries;
     private readonly LineSeries _temperatureSeries;
+    private bool _isApplyingLiveAxisRange;
+    private double _liveSessionStart = double.NaN;
 
     [ObservableProperty]
     private bool showHighVacuum = true;
@@ -63,6 +66,9 @@ public abstract partial class TrendChartViewModel : ObservableObject
 
     [ObservableProperty]
     private string currentFileName = string.Empty;
+
+    [ObservableProperty]
+    private bool isAutoFollow = true;
 
     protected TrendChartViewModel(Dispatcher dispatcher, bool isLive)
     {
@@ -157,6 +163,16 @@ public abstract partial class TrendChartViewModel : ObservableObject
             TemperatureAxisKey);
         TemperaturePlotModel.Series.Add(_temperatureSeries);
 
+        if (_isLive)
+        {
+            foreach (var axis in AllTimeAxes())
+            {
+#pragma warning disable CS0618 // OxyPlot 2.2 只有 AxisChanged 能区分用户的 Zoom/Pan。
+                axis.AxisChanged += OnLiveTimeAxisChanged;
+#pragma warning restore CS0618
+            }
+        }
+
         ApplySeriesVisibility();
     }
 
@@ -172,6 +188,10 @@ public abstract partial class TrendChartViewModel : ObservableObject
 
     public abstract bool IsSimulationMode { get; }
 
+    public bool IsLiveFollowPaused => _isLive && !IsAutoFollow;
+
+    public bool IsAutomaticDisplayAvailable => _isLive;
+
     protected void LoadSamples(IEnumerable<TelemetrySample> samples)
     {
         ClearSeries();
@@ -182,7 +202,10 @@ public abstract partial class TrendChartViewModel : ObservableObject
 
         if (_isLive)
         {
-            TrimToLiveWindow();
+            if (IsAutoFollow && _highVacuumSeries.Points.Count > 0)
+            {
+                ApplyLiveAxes();
+            }
         }
         else
         {
@@ -216,6 +239,34 @@ public abstract partial class TrendChartViewModel : ObservableObject
     partial void OnShowPower2CurrentChanged(bool value) => ApplySeriesVisibility();
 
     partial void OnShowTemperatureChanged(bool value) => ApplySeriesVisibility();
+
+    partial void OnIsAutoFollowChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsLiveFollowPaused));
+        if (value && _isLive && _highVacuumSeries.Points.Count > 0)
+        {
+            ApplyLiveAxes();
+            InvalidatePlots();
+        }
+    }
+
+    [RelayCommand]
+    private void ResumeLiveFollow()
+    {
+        if (!_isLive)
+        {
+            return;
+        }
+
+        ResetValueAxes();
+        IsAutoFollow = true;
+        if (_highVacuumSeries.Points.Count > 0)
+        {
+            ApplyLiveAxes();
+        }
+
+        InvalidatePlots();
+    }
 
     private static DateTimeAxis CreateTimeAxis(string key, AxisPosition position, string title) =>
         new()
@@ -272,8 +323,10 @@ public abstract partial class TrendChartViewModel : ObservableObject
         AddSampleCore(sample);
         if (_isLive)
         {
-            TrimToLiveWindow();
-            ApplyLiveAxes(sample.Timestamp);
+            if (IsAutoFollow)
+            {
+                ApplyLiveAxes();
+            }
         }
 
         InvalidatePlots();
@@ -282,6 +335,11 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private void AddSampleCore(TelemetrySample sample)
     {
         var timestamp = DateTimeAxis.ToDouble(sample.Timestamp.LocalDateTime);
+        if (_isLive && double.IsNaN(_liveSessionStart))
+        {
+            _liveSessionStart = timestamp;
+        }
+
         _highVacuumSeries.Points.Add(new DataPoint(timestamp, sample.HighVacuumPa));
         _filmVacuumSeries.Points.Add(new DataPoint(timestamp, sample.FilmHighVacuumPa));
         _power1VoltageSeries.Points.Add(new DataPoint(timestamp, sample.Power1VoltageV));
@@ -291,40 +349,58 @@ public abstract partial class TrendChartViewModel : ObservableObject
         _temperatureSeries.Points.Add(new DataPoint(timestamp, sample.TemperatureC));
     }
 
-    private void TrimToLiveWindow()
+    private void ApplyLiveAxes()
     {
-        var series = AllSeries();
-        var latest = series[0].Points.Count > 0 ? series[0].Points[^1].X : double.NaN;
-        if (double.IsNaN(latest))
+        var latest = _highVacuumSeries.Points[^1].X;
+        var hasFilledWindow = latest - _liveSessionStart >= LiveWindow.TotalDays;
+        var minimum = hasFilledWindow ? latest - LiveWindow.TotalDays : _liveSessionStart;
+        var maximum = hasFilledWindow
+            ? latest + LiveRightMargin
+            : _liveSessionStart + LiveWindow.TotalDays;
+
+        _isApplyingLiveAxisRange = true;
+        try
+        {
+            foreach (var axis in AllTimeAxes())
+            {
+                axis.Minimum = minimum;
+                axis.Maximum = maximum;
+                axis.Zoom(minimum, maximum);
+            }
+        }
+        finally
+        {
+            _isApplyingLiveAxisRange = false;
+        }
+    }
+
+    private void OnLiveTimeAxisChanged(object? sender, AxisChangedEventArgs args)
+    {
+        if (_isApplyingLiveAxisRange ||
+            args.ChangeType is not (AxisChangeTypes.Zoom or AxisChangeTypes.Pan) ||
+            sender is not DateTimeAxis changedAxis)
         {
             return;
         }
 
-        var cutoff = latest - LiveWindow.TotalDays;
-        foreach (var item in series)
+        IsAutoFollow = false;
+        _isApplyingLiveAxisRange = true;
+        try
         {
-            while (item.Points.Count > 0 && item.Points[0].X < cutoff)
+            foreach (var axis in AllTimeAxes())
             {
-                item.Points.RemoveAt(0);
+                if (!ReferenceEquals(axis, changedAxis))
+                {
+                    axis.Zoom(changedAxis.ActualMinimum, changedAxis.ActualMaximum);
+                }
             }
         }
-    }
-
-    private void ApplyLiveAxes(DateTimeOffset timestamp)
-    {
-        var maximum = DateTimeAxis.ToDouble(timestamp.LocalDateTime);
-        var minimum = maximum - LiveWindow.TotalDays;
-        foreach (var axis in new[]
-                 {
-                     _highVacuumTimeAxis,
-                     _filmVacuumTimeAxis,
-                     _powerTimeAxis,
-                     _temperatureTimeAxis
-                 })
+        finally
         {
-            axis.Minimum = minimum;
-            axis.Maximum = maximum;
+            _isApplyingLiveAxisRange = false;
         }
+
+        InvalidatePlots();
     }
 
     private void ResetArchiveAxes()
@@ -336,6 +412,16 @@ public abstract partial class TrendChartViewModel : ObservableObject
                      _powerTimeAxis,
                      _temperatureTimeAxis
                  })
+        {
+            axis.Minimum = double.NaN;
+            axis.Maximum = double.NaN;
+            axis.Reset();
+        }
+    }
+
+    private void ResetValueAxes()
+    {
+        foreach (var axis in AllValueAxes())
         {
             axis.Minimum = double.NaN;
             axis.Maximum = double.NaN;
@@ -357,11 +443,26 @@ public abstract partial class TrendChartViewModel : ObservableObject
 
     private void ClearSeries()
     {
+        _liveSessionStart = double.NaN;
         foreach (var series in AllSeries())
         {
             series.Points.Clear();
         }
     }
+
+    private DateTimeAxis[] AllTimeAxes() =>
+    [
+        _highVacuumTimeAxis,
+        _filmVacuumTimeAxis,
+        _powerTimeAxis,
+        _temperatureTimeAxis
+    ];
+
+    private IEnumerable<Axis> AllValueAxes() =>
+        VacuumPlotModel.Axes
+            .Concat(PowerPlotModel.Axes)
+            .Concat(TemperaturePlotModel.Axes)
+            .Where(axis => axis is not DateTimeAxis);
 
     private LineSeries[] AllSeries() =>
     [
