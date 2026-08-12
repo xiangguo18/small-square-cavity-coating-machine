@@ -1,11 +1,32 @@
-﻿<Window x:Class="Small_square_cavity_coating_machine.Views.MainView"
+<Window x:Class="Small_square_cavity_coating_machine.Views.MainView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Small_square_cavity_coating_machine.Views"
+        xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
         mc:Ignorable="d"
-        Title="小方腔体磁控溅射镀膜机" Height="750" Width="1200">
+        Title="小方腔体磁控溅射镀膜机" Height="750" Width="1200"
+        Closing="MainView_Closing">
+    <Window.Resources>
+        <controls:ByteArrayToImageSourceConverter x:Key="AvatarConverter"/>
+        <Style x:Key="AccountMenuButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#173B52"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#DCEEFF"/>
+                    <Setter Property="Foreground" Value="#0078D4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80"/>
@@ -58,7 +79,7 @@
             <StackPanel Grid.Row="2" Background="lightBlue">
                
                 <!-- 1 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="IOButton_Click">
+                <RadioButton x:Name="IoMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="IOButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -94,7 +115,7 @@
                 </RadioButton>
 
                 <!-- 2 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="ParameterButton_Click">
+                <RadioButton x:Name="ParameterMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="ParameterButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -130,7 +151,7 @@
                 </RadioButton>
 
                 <!-- 3 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="SystemButton_Click">
+                <RadioButton x:Name="SystemMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" IsChecked="True" Click="SystemButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -166,7 +187,7 @@
                 </RadioButton>
 
                 <!-- 4 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="ProcessButton_Click">
+                <RadioButton x:Name="ProcessMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="ProcessButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -202,7 +223,7 @@
                 </RadioButton>
                 
                 <!-- 5 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="HistoryButton_Click">
+                <RadioButton x:Name="HistoryMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="HistoryButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -238,7 +259,7 @@
                 </RadioButton>
 
                 <!-- 6 -->
-                <RadioButton Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="UserButton_Click">
+                <RadioButton x:Name="UserMenuButton" Height="64" Margin="0" HorizontalAlignment="Stretch" Style="{StaticResource sty1}" Click="UserButton_Click">
                     <RadioButton.Template>
                         <ControlTemplate TargetType="RadioButton">
                             <Grid Background="{TemplateBinding Background}">
@@ -275,6 +296,79 @@
 
             </StackPanel>
 
+            <Border Grid.Row="3"
+                    VerticalAlignment="Bottom"
+                    Background="#C7E5F1"
+                    BorderBrush="#8FC4D8"
+                    BorderThickness="0,1,0,0">
+                <StackPanel>
+                    <Button Height="58"
+                            Click="AccountButton_Click"
+                            Style="{StaticResource AccountMenuButtonStyle}"
+                            ToolTip="点击登录或打开个人资料">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="42" Height="42"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Ellipse Fill="#EAF4FB"
+                                         Stroke="#5BA2C7"
+                                         StrokeThickness="1.5"/>
+                                <TextBlock Text="&#xF007;"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="../Resources/Fonts/#Font Awesome 5 Free"
+                                           FontSize="21"
+                                           Foreground="#1775A8">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding AvatarData}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Image Source="{Binding AvatarData, Converter={StaticResource AvatarConverter}}"
+                                       Stretch="UniformToFill">
+                                    <Image.Clip>
+                                        <EllipseGeometry Center="21,21" RadiusX="20" RadiusY="20"/>
+                                    </Image.Clip>
+                                </Image>
+                            </Grid>
+                            <TextBlock Grid.Column="1"
+                                       Margin="10,0,12,0"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding CurrentUserName}"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="#173B52"/>
+                        </Grid>
+                    </Button>
+
+                    <Button Click="LogoutButton_Click"
+                            Style="{StaticResource AccountMenuButtonStyle}"
+                            ToolTip="退出登录">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xF2F5;" FontFamily="../Resources/Fonts/#Font Awesome 5 Free"
+                                       FontSize="20" TextAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="退出登录" Margin="10,0,0,0"
+                                       FontSize="16" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Button>
+                </StackPanel>
+            </Border>
+
 
         </Grid>
 
@@ -282,5 +376,59 @@
                x:Name="PageNavigation"
                Panel.ZIndex="0"
                NavigationUIVisibility="Hidden"/>
+
+        <Border Grid.Column="1"
+                Margin="0,18,20,0"
+                Padding="13,7"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Panel.ZIndex="4"
+                IsHitTestVisible="False"
+                Background="#E5F1FB"
+                BorderBrush="#77B8E0"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsGuest}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding GuestStatusText}"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="#124A70"/>
+        </Border>
+
+        <Border Grid.Column="1"
+                Margin="0,116,0,0"
+                Padding="16,8"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Panel.ZIndex="5"
+                IsHitTestVisible="False"
+                Background="#FFF4E5"
+                BorderBrush="#E9B56A"
+                BorderThickness="1"
+                CornerRadius="5">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsAuthorizationNoticeVisible}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding AuthorizationNoticeText}"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="#9A4D00"/>
+        </Border>
     </Grid>
 </Window>

@@ -2,9 +2,12 @@ using Small_square_cavity_coating_machine.Models;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Recipes;
+using Small_square_cavity_coating_machine.Services.Security;
 using Small_square_cavity_coating_machine.ViewModels;
 using Small_square_cavity_coating_machine.ViewModels.History;
 using Small_square_cavity_coating_machine.ViewModels.Recipes;
+using Small_square_cavity_coating_machine.ViewModels.Security;
+using System.IO;
 using System.Windows.Threading;
 
 namespace Small_square_cavity_coating_machine.Services;
@@ -20,15 +23,46 @@ public sealed class ApplicationServices : IDisposable
 
     public ApplicationServices(Dispatcher dispatcher)
     {
+        var userDataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SmallSquareCavityCoatingMachine");
+        PasswordHasher = new PasswordHasher();
+        UserRepository = new SqliteUserRepository(
+            Path.Combine(userDataDirectory, "users.db"),
+            PasswordHasher);
+        UserRepository.Initialize();
+
         SessionTrendStore = new SessionTrendStore();
         OperationLogRepository = new InMemoryOperationLogRepository();
         AlarmLogRepository = new InMemoryAlarmLogRepository();
+        UserSession = new UserSession(UserRepository);
+        AuthorizationService = new AuthorizationService(UserSession);
+        AuthenticationService = new AuthenticationService(
+            UserRepository,
+            UserSession,
+            OperationLogRepository);
+        AvatarImageService = new AvatarImageService();
+        var accountDialogService = new WpfAccountDialogService(
+            AuthenticationService,
+            AvatarImageService);
+        AccountShellViewModel = new AccountShellViewModel(
+            AuthenticationService,
+            accountDialogService,
+            AuthorizationService);
+        UserManagementViewModel = new UserManagementViewModel(
+            UserRepository,
+            UserSession,
+            AuthorizationService,
+            AuthenticationService,
+            new WpfUserManagementDialogService());
         var trendFileService = new CsvTrendFileService();
         var fileDialogService = new HistoryFileDialogService();
 
         SeedSimulationHistory();
 
-        ControlViewModel = new ControlViewModel(OperationLogRepository);
+        ControlViewModel = new ControlViewModel(
+            OperationLogRepository,
+            AuthorizationService);
 #if DEBUG
         RecipePlcGateway = new SimulatedRecipePlcGateway();
         ApplicationStatusViewModel.Instance.PlcConnectionState = PlcConnectionState.Connected;
@@ -46,7 +80,8 @@ public sealed class ApplicationServices : IDisposable
             RecipePlcGateway,
             recipeDialogService,
             OperationLogRepository,
-            ApplicationStatusViewModel.Instance);
+            ApplicationStatusViewModel.Instance,
+            AuthorizationService);
 
         var liveTrend = new LiveTrendViewModel(
             dispatcher,
@@ -72,6 +107,22 @@ public sealed class ApplicationServices : IDisposable
     }
 
     public ISessionTrendStore SessionTrendStore { get; }
+
+    public IPasswordHasher PasswordHasher { get; }
+
+    public IUserRepository UserRepository { get; }
+
+    public IUserSession UserSession { get; }
+
+    public IAuthorizationService AuthorizationService { get; }
+
+    public IAuthenticationService AuthenticationService { get; }
+
+    public IAvatarImageService AvatarImageService { get; }
+
+    public AccountShellViewModel AccountShellViewModel { get; }
+
+    public UserManagementViewModel UserManagementViewModel { get; }
 
     public IOperationLogRepository OperationLogRepository { get; }
 

@@ -2,8 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Models.Recipes;
+using Small_square_cavity_coating_machine.Models.Security;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Recipes;
+using Small_square_cavity_coating_machine.Services.Security;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
@@ -18,8 +20,10 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     private readonly IRecipeUserDialogService _dialogService;
     private readonly IOperationLogRepository _operationLogRepository;
     private readonly ApplicationStatusViewModel _applicationStatus;
+    private readonly IAuthorizationService? _authorization;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly List<RecipeLayer> _selectedLayers = [];
+    private CancellationTokenSource? _activeRunCancellation;
 
     public ProcessViewModel(
         IRecipeExcelImporter excelImporter,
@@ -27,7 +31,8 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         IRecipePlcGateway plcGateway,
         IRecipeUserDialogService dialogService,
         IOperationLogRepository operationLogRepository,
-        ApplicationStatusViewModel applicationStatus)
+        ApplicationStatusViewModel applicationStatus,
+        IAuthorizationService? authorization = null)
     {
         _excelImporter = excelImporter;
         _dispatchService = dispatchService;
@@ -35,10 +40,18 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         _dialogService = dialogService;
         _operationLogRepository = operationLogRepository;
         _applicationStatus = applicationStatus;
+        _authorization = authorization;
+        if (_authorization is not null)
+        {
+            _authorization.AccessChanged += Authorization_AccessChanged;
+        }
         Layers.CollectionChanged += Layers_CollectionChanged;
     }
 
     public ObservableCollection<RecipeLayer> Layers { get; } = [];
+
+    public bool CanOperate =>
+        _authorization?.CanOperate(PermissionKey.ProcessRecipe) ?? true;
 
     [ObservableProperty]
     private bool isRunning;
@@ -57,6 +70,11 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanImportOrCreate))]
     private void ImportRecipe()
     {
+        if (!EnsureCanOperate())
+        {
+            return;
+        }
+
         var path = _dialogService.SelectRecipeFile();
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -94,6 +112,11 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanImportOrCreate))]
     private void NewRecipeLayer()
     {
+        if (!EnsureCanOperate())
+        {
+            return;
+        }
+
         var nextSequence = Layers.Count == 0 ? 1 : Layers.Max(layer => layer.Sequence) + 1;
         var layer = _dialogService.ShowNewLayerDialog(nextSequence);
         if (layer is null)
@@ -109,12 +132,14 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(CanSendAll))]
-    private Task SendAllAsync()
-        => RunRecipeAsync(RecipeDispatchMode.All, Layers);
+    private Task SendAllAsync() => EnsureCanOperate()
+        ? RunRecipeAsync(RecipeDispatchMode.All, Layers)
+        : Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(CanSendSelected))]
-    private Task SendSelectedAsync()
-        => RunRecipeAsync(RecipeDispatchMode.Selected, _selectedLayers);
+    private Task SendSelectedAsync() => EnsureCanOperate()
+        ? RunRecipeAsync(RecipeDispatchMode.Selected, _selectedLayers)
+        : Task.CompletedTask;
 
     private bool CanImportOrCreate() => !IsRunning;
 
@@ -122,6 +147,9 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 
     private bool CanSendSelected()
         => !IsRunning && _plcGateway.IsAvailable && _selectedLayers.Count > 0;
+
+    private bool EnsureCanOperate() =>
+        _authorization?.TryAuthorize(PermissionKey.ProcessRecipe) ?? true;
 
     private async Task RunRecipeAsync(
         RecipeDispatchMode mode,
@@ -144,12 +172,18 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         var progress = new Progress<RecipeRunProgress>(UpdateRunProgress);
 
         RecipeRunResult result;
+        using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+        _activeRunCancellation = runCancellation;
         try
         {
-            result = await _dispatchService.RunAsync(request, progress, _shutdown.Token);
+            result = await _dispatchService.RunAsync(request, progress, runCancellation.Token);
         }
         finally
         {
+            if (ReferenceEquals(_activeRunCancellation, runCancellation))
+            {
+                _activeRunCancellation = null;
+            }
             ClearCurrentHighlight();
             IsRunning = false;
             RefreshCommandStates();
@@ -233,6 +267,17 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         SendSelectedCommand.NotifyCanExecuteChanged();
     }
 
+    private void Authorization_AccessChanged(object? sender, EventArgs e)
+    {
+        if (!CanOperate)
+        {
+            _activeRunCancellation?.Cancel();
+        }
+
+        OnPropertyChanged(nameof(CanOperate));
+        RefreshCommandStates();
+    }
+
     private void ClearCurrentHighlight()
     {
         foreach (var layer in Layers)
@@ -245,7 +290,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     {
         _operationLogRepository.Add(new OperationLogRecord(
             DateTimeOffset.Now,
-            "本地操作员",
+            _authorization?.CurrentUserName ?? "本地操作员",
             target,
             action,
             string.Empty,
@@ -257,7 +302,12 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (_authorization is not null)
+        {
+            _authorization.AccessChanged -= Authorization_AccessChanged;
+        }
         Layers.CollectionChanged -= Layers_CollectionChanged;
+        _activeRunCancellation?.Cancel();
         _shutdown.Cancel();
         _shutdown.Dispose();
     }
