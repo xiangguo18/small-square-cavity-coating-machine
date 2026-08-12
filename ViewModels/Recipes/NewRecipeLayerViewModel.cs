@@ -36,13 +36,20 @@ public sealed partial class RecipeParameterInput : ObservableObject
     private string valueText;
 }
 
-public sealed class NewRecipeLayerViewModel
+public sealed partial class NewRecipeLayerViewModel : ObservableObject
 {
-    private readonly RecipeParameterInput[] _orderedInputs;
+    private readonly RecipeParameterInput[] _commonInputs;
+
+    [ObservableProperty]
+    private string sequenceText;
+
+    [ObservableProperty]
+    private RecipePressureControlMode pressureControlMode = RecipePressureControlMode.Pressure;
 
     public NewRecipeLayerViewModel(int sequence)
     {
-        Sequence = sequence;
+        MaximumSequence = sequence;
+        SequenceText = sequence.ToString(CultureInfo.InvariantCulture);
 
         PowerAndTimeInputs =
         [
@@ -70,39 +77,127 @@ public sealed class NewRecipeLayerViewModel
             new("气流稳定时间", "s", 2d)
         ];
 
-        PressureAndApcInputs =
+        PressureInputs =
         [
             new("启辉气压", "Pa"),
-            new("工作气压", "Pa"),
+            new("工作气压", "Pa")
+        ];
+
+        ApcInputs =
+        [
             new("启辉APC", "%", maximum: 100d),
             new("工作APC", "%", maximum: 100d)
         ];
 
-        _orderedInputs =
+        _commonInputs =
         [
             .. PowerAndTimeInputs,
-            .. GasInputs,
-            .. PressureAndApcInputs
+            .. GasInputs
         ];
     }
 
-    public int Sequence { get; }
+    public int MaximumSequence { get; }
 
     public IReadOnlyList<RecipeParameterInput> PowerAndTimeInputs { get; }
 
     public IReadOnlyList<RecipeParameterInput> GasInputs { get; }
 
-    public IReadOnlyList<RecipeParameterInput> PressureAndApcInputs { get; }
+    public IReadOnlyList<RecipeParameterInput> PressureInputs { get; }
+
+    public IReadOnlyList<RecipeParameterInput> ApcInputs { get; }
+
+    public bool IsPressureMode
+    {
+        get => PressureControlMode == RecipePressureControlMode.Pressure;
+        set
+        {
+            if (value)
+            {
+                PressureControlMode = RecipePressureControlMode.Pressure;
+            }
+        }
+    }
+
+    public bool IsApcMode
+    {
+        get => PressureControlMode == RecipePressureControlMode.ApcPosition;
+        set
+        {
+            if (value)
+            {
+                PressureControlMode = RecipePressureControlMode.ApcPosition;
+            }
+        }
+    }
 
     public bool TryBuildLayer(out RecipeLayer? layer, out string error)
     {
         layer = null;
         error = string.Empty;
-        var values = new double[_orderedInputs.Length];
 
-        for (var index = 0; index < _orderedInputs.Length; index++)
+        if (!int.TryParse(SequenceText?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var sequence)
+            || sequence < 1
+            || sequence > MaximumSequence)
         {
-            var input = _orderedInputs[index];
+            error = $"“插入序号”必须是 1-{MaximumSequence} 之间的整数。";
+            return false;
+        }
+
+        var commonValues = new double[_commonInputs.Length];
+
+        if (!TryReadInputs(_commonInputs, commonValues, out error))
+        {
+            return false;
+        }
+
+        var modeInputs = IsPressureMode ? PressureInputs : ApcInputs;
+        var modeValues = new double[2];
+        if (!TryReadInputs(modeInputs, modeValues, out error))
+        {
+            return false;
+        }
+
+        layer = new RecipeLayer
+        {
+            Sequence = sequence,
+            CathodeAPower = commonValues[0],
+            CathodeBPower = commonValues[1],
+            PowerSpan = commonValues[2],
+            IntervalSeconds = commonValues[3],
+            PreSputterSeconds = commonValues[4],
+            StageSpeedRpm = commonValues[5],
+            CoatingSeconds = commonValues[6],
+            IgnitionArgonSccm = commonValues[7],
+            WorkingArgonSccm = commonValues[8],
+            IgnitionNitrogenSccm = commonValues[9],
+            WorkingNitrogenSccm = commonValues[10],
+            IgnitionOxygenSccm = commonValues[11],
+            WorkingOxygenSccm = commonValues[12],
+            GasStabilizationSeconds = commonValues[13],
+            IgnitionPressurePa = IsPressureMode ? modeValues[0] : 0d,
+            WorkingPressurePa = IsPressureMode ? modeValues[1] : 0d,
+            IgnitionApcPercent = IsApcMode ? modeValues[0] : 0d,
+            WorkingApcPercent = IsApcMode ? modeValues[1] : 0d,
+            PressureControlMode = PressureControlMode
+        };
+        return true;
+    }
+
+    partial void OnPressureControlModeChanged(RecipePressureControlMode value)
+    {
+        OnPropertyChanged(nameof(IsPressureMode));
+        OnPropertyChanged(nameof(IsApcMode));
+    }
+
+    private static bool TryReadInputs(
+        IReadOnlyList<RecipeParameterInput> inputs,
+        double[] values,
+        out string error)
+    {
+        error = string.Empty;
+        for (var index = 0; index < inputs.Count; index++)
+        {
+            var input = inputs[index];
             if (!TryParseNumber(input.ValueText, out var value))
             {
                 error = $"“{input.Label}”必须是有效数字。";
@@ -124,28 +219,6 @@ public sealed class NewRecipeLayerViewModel
             values[index] = value;
         }
 
-        layer = new RecipeLayer
-        {
-            Sequence = Sequence,
-            CathodeAPower = values[0],
-            CathodeBPower = values[1],
-            PowerSpan = values[2],
-            IntervalSeconds = values[3],
-            PreSputterSeconds = values[4],
-            StageSpeedRpm = values[5],
-            CoatingSeconds = values[6],
-            IgnitionArgonSccm = values[7],
-            WorkingArgonSccm = values[8],
-            IgnitionNitrogenSccm = values[9],
-            WorkingNitrogenSccm = values[10],
-            IgnitionOxygenSccm = values[11],
-            WorkingOxygenSccm = values[12],
-            GasStabilizationSeconds = values[13],
-            IgnitionPressurePa = values[14],
-            WorkingPressurePa = values[15],
-            IgnitionApcPercent = values[16],
-            WorkingApcPercent = values[17]
-        };
         return true;
     }
 

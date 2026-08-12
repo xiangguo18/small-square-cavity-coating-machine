@@ -1,6 +1,7 @@
 using Small_square_cavity_coating_machine.Models.Recipes;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Recipes;
+using Small_square_cavity_coating_machine.ViewModels;
 using Small_square_cavity_coating_machine.ViewModels.Recipes;
 using System.IO.Compression;
 using System.Text;
@@ -84,6 +85,122 @@ public sealed class RecipeFeatureTests
     }
 
     [Fact]
+    public void NewLayerDialogModel_PressureModeIgnoresApcInputs()
+    {
+        var viewModel = new NewRecipeLayerViewModel(1);
+        viewModel.PressureInputs[0].ValueText = "1.2";
+        viewModel.PressureInputs[1].ValueText = "2.3";
+        viewModel.ApcInputs[0].ValueText = "不是数字";
+        viewModel.ApcInputs[1].ValueText = "200";
+
+        var successful = viewModel.TryBuildLayer(out var layer, out var error);
+
+        Assert.True(successful, error);
+        Assert.NotNull(layer);
+        Assert.Equal(RecipePressureControlMode.Pressure, layer.PressureControlMode);
+        Assert.Equal(1.2d, layer.IgnitionPressurePa);
+        Assert.Equal(2.3d, layer.WorkingPressurePa);
+        Assert.Equal(0d, layer.IgnitionApcPercent);
+        Assert.Equal(0d, layer.WorkingApcPercent);
+    }
+
+    [Fact]
+    public void NewLayerDialogModel_ApcModeIgnoresPressureInputs()
+    {
+        var viewModel = new NewRecipeLayerViewModel(1)
+        {
+            IsApcMode = true
+        };
+        viewModel.PressureInputs[0].ValueText = "不是数字";
+        viewModel.PressureInputs[1].ValueText = "-1";
+        viewModel.ApcInputs[0].ValueText = "35";
+        viewModel.ApcInputs[1].ValueText = "45";
+
+        var successful = viewModel.TryBuildLayer(out var layer, out var error);
+
+        Assert.True(successful, error);
+        Assert.NotNull(layer);
+        Assert.Equal(RecipePressureControlMode.ApcPosition, layer.PressureControlMode);
+        Assert.Equal(0d, layer.IgnitionPressurePa);
+        Assert.Equal(0d, layer.WorkingPressurePa);
+        Assert.Equal(35d, layer.IgnitionApcPercent);
+        Assert.Equal(45d, layer.WorkingApcPercent);
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("3", 3)]
+    [InlineData("6", 6)]
+    public void NewLayerDialogModel_AcceptsInsertionSequence(string input, int expected)
+    {
+        var viewModel = new NewRecipeLayerViewModel(6)
+        {
+            SequenceText = input
+        };
+
+        var successful = viewModel.TryBuildLayer(out var layer, out var error);
+
+        Assert.True(successful, error);
+        Assert.NotNull(layer);
+        Assert.Equal(expected, layer.Sequence);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("7")]
+    [InlineData("1.5")]
+    [InlineData("不是整数")]
+    public void NewLayerDialogModel_RejectsInvalidInsertionSequence(string input)
+    {
+        var viewModel = new NewRecipeLayerViewModel(6)
+        {
+            SequenceText = input
+        };
+
+        Assert.False(viewModel.TryBuildLayer(out _, out var error));
+        Assert.Contains("1-6", error);
+    }
+
+    [Fact]
+    public void ProcessViewModel_InsertsLayerAndShiftsFollowingSequences()
+    {
+        var dialog = new RecordingRecipeDialogService
+        {
+            NewLayerResult = new RecipeLayer { Sequence = 3, CathodeAPower = 999d }
+        };
+        using var viewModel = CreateProcessViewModel(dialog);
+        for (var sequence = 1; sequence <= 5; sequence++)
+        {
+            viewModel.Layers.Add(new RecipeLayer
+            {
+                Sequence = sequence,
+                CathodeAPower = sequence * 100d
+            });
+        }
+
+        viewModel.NewRecipeLayerCommand.Execute(null);
+
+        Assert.Equal([1, 2, 3, 4, 5, 6], viewModel.Layers.Select(layer => layer.Sequence));
+        Assert.Equal(999d, viewModel.Layers.Single(layer => layer.Sequence == 3).CathodeAPower);
+        Assert.Equal(300d, viewModel.Layers.Single(layer => layer.Sequence == 4).CathodeAPower);
+        Assert.Equal(500d, viewModel.Layers.Single(layer => layer.Sequence == 6).CathodeAPower);
+    }
+
+    [Fact]
+    public void ProcessViewModel_DisablesRecipeMutationCommandsWhileRunning()
+    {
+        var dialog = new RecordingRecipeDialogService();
+        using var viewModel = CreateProcessViewModel(dialog);
+        viewModel.Layers.Add(new RecipeLayer { Sequence = 1 });
+
+        viewModel.IsRunning = true;
+
+        Assert.False(viewModel.ImportRecipeCommand.CanExecute(null));
+        Assert.False(viewModel.ClearRecipeCommand.CanExecute(null));
+        Assert.False(viewModel.NewRecipeLayerCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task Dispatch_SendsSignedSpeedUnchangedAndWaitsForProcessComplete()
     {
         var gateway = new RecordingRecipeGateway();
@@ -137,6 +254,21 @@ public sealed class RecipeFeatureTests
         LayerCompleteTimeout = TimeSpan.FromSeconds(1),
         ProcessCompleteTimeout = TimeSpan.FromSeconds(1)
     };
+
+    private static ProcessViewModel CreateProcessViewModel(IRecipeUserDialogService dialogService)
+    {
+        var gateway = new RecordingRecipeGateway();
+        return new ProcessViewModel(
+            new EmptyRecipeImporter(),
+            new RecipeDispatchService(
+                gateway,
+                new InMemoryOperationLogRepository(),
+                FastOptions),
+            gateway,
+            dialogService,
+            new InMemoryOperationLogRepository(),
+            ApplicationStatusViewModel.Instance);
+    }
 
     private static string CreatePositionMappedWorkbook()
     {
@@ -258,6 +390,37 @@ public sealed class RecipeFeatureTests
         {
             ProcessCompletionWasObserved = true;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class EmptyRecipeImporter : IRecipeExcelImporter
+    {
+        public RecipeImportResult Import(string filePath)
+            => new([], [new RecipeImportError(0, 0, "测试未配置导入文件")]);
+    }
+
+    private sealed class RecordingRecipeDialogService : IRecipeUserDialogService
+    {
+        public RecipeLayer? NewLayerResult { get; init; }
+
+        public string? SelectRecipeFile() => null;
+
+        public bool ConfirmReplaceExistingRecipe() => true;
+
+        public bool ConfirmClearRecipe() => true;
+
+        public RecipeLayer? ShowNewLayerDialog(int nextSequence) => NewLayerResult;
+
+        public void ShowImportErrors(IReadOnlyList<RecipeImportError> errors)
+        {
+        }
+
+        public void ShowInformation(string message, string title)
+        {
+        }
+
+        public void ShowRunFinished(RecipeRunResult result)
+        {
         }
     }
 }

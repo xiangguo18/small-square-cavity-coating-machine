@@ -75,6 +75,8 @@ public interface IRecipeExcelImporter
 /// <summary>
 /// 隔离真实 OPC UA 点位和配方调度逻辑。真实实现必须在方法内部完成
 /// 权限/互锁检查、参数块写入、请求脉冲以及反馈边沿去重。
+/// 新建层应按 PressureControlMode 仅写入控压或 APC 定位点位；
+/// Excel 导入层的 ImportedValues 则保持兼容，完整写入 A-S 参数块。
 /// </summary>
 public interface IRecipePlcGateway
 {
@@ -106,6 +108,8 @@ public interface IRecipeUserDialogService
     string? SelectRecipeFile();
 
     bool ConfirmReplaceExistingRecipe();
+
+    bool ConfirmClearRecipe();
 
     RecipeLayer? ShowNewLayerDialog(int nextSequence);
 

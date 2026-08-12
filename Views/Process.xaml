@@ -35,19 +35,19 @@
 
         <Style x:Key="RecipeGridHeaderStyle" TargetType="DataGridColumnHeader">
             <Setter Property="Height" Value="58"/>
-            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Padding" Value="2"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="#DCECF7"/>
             <Setter Property="Foreground" Value="#173B52"/>
             <Setter Property="BorderBrush" Value="#AEC6D6"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
         <Style x:Key="RecipeGridCellStyle" TargetType="DataGridCell">
-            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Padding" Value="2,4"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="BorderBrush" Value="#D8E1E7"/>
@@ -101,6 +101,9 @@
                                     Command="{Binding ImportRecipeCommand}"
                                     Content="导入配方"/>
                             <Button Style="{StaticResource RecipeActionButtonStyle}"
+                                    Command="{Binding ClearRecipeCommand}"
+                                    Content="清除配方"/>
+                            <Button Style="{StaticResource RecipeActionButtonStyle}"
                                     Command="{Binding NewRecipeLayerCommand}"
                                     Content="新建配方层"/>
                             <Button Style="{StaticResource RecipeActionButtonStyle}"
@@ -148,67 +151,67 @@
                               BorderBrush="#AEC6D6"
                               BorderThickness="1"
                               Background="White"
-                              FontSize="14"
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              FontSize="13"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               SelectionChanged="RecipeGrid_SelectionChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="序号"
-                                                Width="70"
+                                                Width="0.62*"
                                                 Binding="{Binding Sequence}"/>
                             <DataGridTextColumn Header="阴极A功率&#x0a;(W)"
-                                                Width="104"
+                                                Width="1.05*"
                                                 Binding="{Binding CathodeAPower, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="阴极B功率&#x0a;(W)"
-                                                Width="104"
+                                                Width="1.05*"
                                                 Binding="{Binding CathodeBPower, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="功率跨度&#x0a;(W)"
-                                                Width="96"
+                                                Width="0.95*"
                                                 Binding="{Binding PowerSpan, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="间隔时间&#x0a;(s)"
-                                                Width="96"
+                                                Width="0.92*"
                                                 Binding="{Binding IntervalSeconds, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="预溅射时间&#x0a;(s)"
-                                                Width="104"
+                                                Width="1.02*"
                                                 Binding="{Binding PreSputterSeconds, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="样品台转速&#x0a;(rpm)"
-                                                Width="112"
+                                                Width="1.08*"
                                                 Binding="{Binding StageSpeedRpm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="镀膜时间&#x0a;(s)"
-                                                Width="96"
+                                                Width="0.92*"
                                                 Binding="{Binding CoatingSeconds, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="启辉Ar&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding IgnitionArgonSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="工作Ar&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding WorkingArgonSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="启辉N₂&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding IgnitionNitrogenSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="工作N₂&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding WorkingNitrogenSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="启辉O₂&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding IgnitionOxygenSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="工作O₂&#x0a;(Sccm)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding WorkingOxygenSccm, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="气流稳定时间&#x0a;(s)"
-                                                Width="120"
+                                                Width="1.12*"
                                                 Binding="{Binding GasStabilizationSeconds, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="启辉气压&#x0a;(Pa)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding IgnitionPressurePa, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="工作气压&#x0a;(Pa)"
-                                                Width="98"
+                                                Width="0.9*"
                                                 Binding="{Binding WorkingPressurePa, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="启辉APC&#x0a;(%)"
-                                                Width="96"
+                                                Width="0.88*"
                                                 Binding="{Binding IgnitionApcPercent, StringFormat=0.###}"/>
                             <DataGridTextColumn Header="工作APC&#x0a;(%)"
-                                                Width="96"
+                                                Width="0.88*"
                                                 Binding="{Binding WorkingApcPercent, StringFormat=0.###}"/>
                         </DataGrid.Columns>
                     </DataGrid>

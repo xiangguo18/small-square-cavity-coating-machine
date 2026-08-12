@@ -35,6 +35,18 @@ public sealed class WpfRecipeUserDialogService : IRecipeUserDialogService
                == MessageBoxResult.Yes;
     }
 
+    public bool ConfirmClearRecipe()
+    {
+        return MessageBox.Show(
+                   Application.Current.MainWindow,
+                   "清除后当前表格中的全部配方层都将被移除，是否继续？",
+                   "清除当前配方",
+                   MessageBoxButton.YesNo,
+                   MessageBoxImage.Warning,
+                   MessageBoxResult.No)
+               == MessageBoxResult.Yes;
+    }
+
     public RecipeLayer? ShowNewLayerDialog(int nextSequence)
     {
         var viewModel = new NewRecipeLayerViewModel(nextSequence);

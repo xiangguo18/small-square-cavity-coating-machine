@@ -57,38 +57,53 @@
         </controls:HmiPageLayout.HeaderRightContent>
 
         <controls:HmiPageLayout.PageContent>
-            <Border Padding="12"
-                    Background="White"
-                    BorderBrush="#D6DEE5"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    ClipToBounds="True">
-            <Viewbox Stretch="Uniform"
-                         StretchDirection="Both" Margin="-3,1,3,0">
-                <!-- 更宽的逻辑缩放区域使菜单宽度变化在最大化状态下仍能驱动等比例缩放；
-                         实际设备画布保持 1020 宽并靠左，680 高度容纳右侧完整控件区。 -->
-                <Grid Width="1440" Height="680">
-                    <Canvas Width="1020"
-                                Height="680"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Top">
-                        <!-- 腔体与真空度计 -->
-                        <!-- 腔体与真空度计 -->
-                        <!-- 腔体与真空度计 -->
-                        <!-- 腔体与真空度计 -->
-                        <!-- 腔体与真空度计 -->
-                        <!-- 腔体与真空度计 -->
+            <Grid>
+                <Border Padding="12"
+                        Background="White"
+                        BorderBrush="#D6DEE5"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        ClipToBounds="True">
+                    <!-- 左右控制区保持稳定宽度，中间区域使用运行时的全部剩余空间。 -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="205"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="3"/>
+                            <ColumnDefinition Width="348"/>
+                        </Grid.ColumnDefinitions>
 
-                        <controls:StraightPipeControl
+                        <!-- 中间区域仅承载设备与气路示意图；内部坐标保持不变并独立等比例缩放。 -->
+                        <Border Grid.Column="2"
+                            Margin="0,10,0,10"
+                            Background="#FFFFFF"
+                            BorderBrush="#C6D2DC"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            ClipToBounds="True">
+                            <Viewbox Margin="6"
+                                 Stretch="Uniform"
+                                 StretchDirection="Both">
+                                <Canvas Width="826"
+                                    Height="658">
+                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
+
+                                    <controls:StraightPipeControl
                         Canvas.Left="553" Canvas.Top="129"
                         Width="47" Height="24"
                         IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
                         FlowAnimationDirection="Forward"
                         AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 
-                        <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
 
-                        <controls:ApcValveControl
+                                    <controls:ApcValveControl
                                                           Width="310"
                                                           Height="192"
                                                           FontSize="16"
@@ -105,77 +120,77 @@
                                                           ToggleModeCommand="{Binding ToggleApcModeCommand}"
                                                           PositionSetpointCommand="{Binding SetApcPositionCommand}"
                                                           PressureSetpointCommand="{Binding SetApcPressureCommand}" HorizontalAlignment="Left" Canvas.Left="433" Canvas.Top="20" VerticalAlignment="Top"/>
-                        <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
 
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="748" Canvas.Top="214"
                             Width="24" Height="37"
                             Orientation="Vertical"
                             IsFlowing="{Binding RightForelineToDryPumpPipeIsFlowing}"
                             FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
 
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="68" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
                             IsFlowing="{Binding ArgonMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="223" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
                             IsFlowing="{Binding NitrogenMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="378" Canvas.Top="542"
                             Width="24" Height="38"
                             Orientation="Vertical"
                             IsFlowing="{Binding OxygenMfcPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="378" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
                             IsFlowing="{Binding OxygenValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="223" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
                             IsFlowing="{Binding NitrogenValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="68" Canvas.Top="473"
                             Width="24" Height="30"
                             Orientation="Vertical"
                             IsFlowing="{Binding ArgonValvePairPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <!-- 腔体与真空度计 -->
-                        <controls:ElbowPipeControl Canvas.Left="30" Canvas.Top="345"
+                                    <!-- 腔体与真空度计 -->
+                                    <controls:ElbowPipeControl Canvas.Left="30" Canvas.Top="345"
                             Width="100" Height="100"
                             Orientation="BottomRight"
                             IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:ElbowPipeControl Canvas.Left="340" Canvas.Top="345"
+                                    <controls:ElbowPipeControl Canvas.Left="340" Canvas.Top="345"
                             Width="100" Height="100"
                             Orientation="BottomLeft"
                             IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="222" Canvas.Top="404"
                             Width="24" Height="30"
                             Orientation="Vertical"
                             IsFlowing="{Binding NitrogenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="222" Canvas.Top="349"
                             Width="24" Height="30"
                             Orientation="Vertical"
                             IsFlowing="{Binding ChamberToMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
-                        <controls:VacuumGaugeControl
+                                    <controls:VacuumGaugeControl
                             Canvas.Left="46"
                             Width="160" Height="120"
                             DisplayName="高真空度计"
@@ -187,7 +202,7 @@
                             Unit="Pa"
                             ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Top" RenderTransformOrigin="-0.361,0.508"/>
 
-                        <controls:VacuumGaugeControl
+                                    <controls:VacuumGaugeControl
                             Canvas.Left="265"
                             Width="160" Height="120"
                             DisplayName="薄膜真空度计"
@@ -199,28 +214,28 @@
                             ToggleCommand="{Binding ToggleFilmGaugeCommand}"
                             Unit="Pa"
                             ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与真空度计 -->
 
-                        <controls:ElbowPipeControl Canvas.Left="423" Canvas.Top="276"
+                                    <controls:ElbowPipeControl Canvas.Left="423" Canvas.Top="276"
                             Width="101" Height="100"
                             Orientation="BottomLeft"
                             IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <Rectangle Canvas.Left="46" Canvas.Top="107"
+                                    <Rectangle Canvas.Left="46" Canvas.Top="107"
                                Width="379" Height="247"
                                RadiusX="12" RadiusY="12"
                                Fill="#F7F8FA"
                                Stroke="#34495E"
                                StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <TextBlock Canvas.Left="150" Canvas.Top="217"
+                                    <TextBlock Canvas.Left="150" Canvas.Top="217"
                                Width="164"
                                Text="真空腔体"
                                FontSize="25"
                                FontWeight="SemiBold"
                                Foreground="#34495E"
                                TextAlignment="Center" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <!-- 腔体与真空度计 -->
-                        <controls:ValveControl
+                                    <!-- 腔体与真空度计 -->
+                                    <controls:ValveControl
                             Canvas.Left="25" Canvas.Top="414"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -228,7 +243,7 @@
                             IsOpen="{Binding ArgonUpperValveIsOpen}"
                             IsInterlockReleased="{Binding ArgonUpperValveInterlockReleased}"
                             Command="{Binding ToggleArgonUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top" Click="ValveControl_Click"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="180" Canvas.Top="414"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -236,7 +251,7 @@
                             IsOpen="{Binding NitrogenUpperValveIsOpen}"
                             IsInterlockReleased="{Binding NitrogenUpperValveInterlockReleased}"
                             Command="{Binding ToggleNitrogenUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="335" Canvas.Top="414"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -244,7 +259,7 @@
                             IsOpen="{Binding OxygenUpperValveIsOpen}"
                             IsInterlockReleased="{Binding OxygenUpperValveInterlockReleased}"
                             Command="{Binding ToggleOxygenUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="180" Canvas.Top="484"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -252,7 +267,7 @@
                             IsOpen="{Binding NitrogenLowerValveIsOpen}"
                             IsInterlockReleased="{Binding NitrogenLowerValveInterlockReleased}"
                             Command="{Binding ToggleNitrogenLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="25" Canvas.Top="484"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -260,8 +275,8 @@
                             IsOpen="{Binding ArgonLowerValveIsOpen}"
                             IsInterlockReleased="{Binding ArgonLowerValveInterlockReleased}"
                             Command="{Binding ToggleArgonLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <!-- 腔体右侧：横管、横阀、弯头和干泵 -->
-                        <controls:ValveControl
+                                    <!-- 腔体右侧：横管、横阀、弯头和干泵 -->
+                                    <controls:ValveControl
                         Canvas.Left="479" Canvas.Top="222"
                         Width="111" Height="100"
                         DeviceName="旁抽阀"
@@ -270,8 +285,8 @@
                         IsInterlockReleased="{Binding BypassValveInterlockReleased}"
                         Command="{Binding ToggleBypassValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
-                        <!-- MFC 三行显示 -->
-                        <controls:MfcFlowMeterControl
+                                    <!-- MFC 三行显示 -->
+                                    <controls:MfcFlowMeterControl
                         Canvas.Left="305" Canvas.Top="577"
                         Width="170" Height="80"
                         DisplayName="MFC · O2"
@@ -280,26 +295,26 @@
                         Unit="sccm"
                         ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 
-                        <!-- 直管 + 两个弯头拼成连续的U形管路 -->
-                        <controls:StraightPipeControl
+                                    <!-- 直管 + 两个弯头拼成连续的U形管路 -->
+                                    <controls:StraightPipeControl
                         Canvas.Left="425" Canvas.Top="246"
                         Width="82" Height="24"
                         IsFlowing="{Binding ChamberToBypassPipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
-                        <!-- 四种弯头方向，用于在设计器中复制 -->
-                        <controls:StraightPipeControl
+                                    <!-- 四种弯头方向，用于在设计器中复制 -->
+                                    <controls:StraightPipeControl
                         Canvas.Left="425" Canvas.Top="130"
                         Width="82" Height="24"
                         IsFlowing="{Binding ChamberToApcPipeIsFlowing}"
                         FlowAnimationDirection="Forward"
                         AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <controls:ElbowPipeControl Canvas.Left="710" Canvas.Top="91"
+                                    <controls:ElbowPipeControl Canvas.Left="710" Canvas.Top="91"
                         Width="100" Height="100"
                         Orientation="BottomLeft"
                         IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
                         FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:MfcFlowMeterControl
+                                    <controls:MfcFlowMeterControl
                         Canvas.Left="150" Canvas.Top="577"
                         Width="170" Height="80"
                         DisplayName="MFC · N2"
@@ -307,25 +322,25 @@
                         SetpointFlow="{Binding ArgonSetpointFlow}"
                         Unit="sccm"
                         ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <controls:MfcFlowMeterControl Canvas.Top="577"
+                                    <controls:MfcFlowMeterControl Canvas.Top="577"
                         Width="170" Height="80"
                         DisplayName="MFC · Ar"
                         CurrentFlow="{Binding ArgonCurrentFlow}"
                         SetpointFlow="{Binding ArgonSetpointFlow}"
                         Unit="sccm"
                         ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Center" Canvas.Left="-5"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                         Canvas.Left="461" Canvas.Top="408"
                         Width="24" Height="37"
                         Orientation="Vertical"
                         IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                         Canvas.Left="658" Canvas.Top="129"
                         Width="52" Height="24"
                         IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
                         FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.653,-3.247"/>
-                        <controls:TurbomolecularPumpControl
+                                    <controls:TurbomolecularPumpControl
                         Canvas.Left="578" Canvas.Top="99"
                         Width="100" Height="100"
                         DeviceName="分子泵"
@@ -333,7 +348,7 @@
                         IsRunning="{Binding TurboPumpIsRunning}"
                         IsInterlockReleased="{Binding TurboPumpInterlockReleased}"
                         Command="{Binding ToggleTurboPumpCommand}" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="2.055,0.6"/>
-                        <controls:VacuumGaugeControl
+                                    <controls:VacuumGaugeControl
                             Canvas.Left="535" Canvas.Top="259"
                             Width="160" Height="120"
                             DisplayName="前级真空度计"
@@ -345,31 +360,31 @@
                             CanToggle="False"
                             Unit="Pa"
                             ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="130" Canvas.Top="383"
                             Width="55" Height="24"
                             IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="283" Canvas.Top="383"
                             Width="57" Height="24"
                             IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
                             FlowAnimationDirection="Reverse" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <controls:StraightPipeControl
+                                    <controls:StraightPipeControl
                             Canvas.Left="557" Canvas.Top="246"
                             Width="196" Height="24"
                             IsFlowing="{Binding BypassToDryPumpPipeIsFlowing}"
                             FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <Rectangle Canvas.Left="185" Canvas.Top="372" Width="99" Height="46" RadiusX="12" RadiusY="12"
+                                    <Rectangle Canvas.Left="185" Canvas.Top="372" Width="99" Height="46" RadiusX="12" RadiusY="12"
                                Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="3" HorizontalAlignment="Center" VerticalAlignment="Top" RenderTransformOrigin="0.484,0.322" />
-                        <TextBlock Canvas.Left="152" Canvas.Top="378"
+                                    <TextBlock Canvas.Left="152" Canvas.Top="378"
                             Width="164"
                             Text="混气室"
                             FontSize="25"
                             FontWeight="SemiBold"
                             Foreground="#34495E"
                             TextAlignment="Center" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="335" Canvas.Top="484"
                             Width="110" Height="100"
                             DeviceName="前级阀"
@@ -377,7 +392,7 @@
                             IsOpen="{Binding OxygenLowerValveIsOpen}"
                             IsInterlockReleased="{Binding OxygenLowerValveInterlockReleased}"
                             Command="{Binding ToggleOxygenLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                         Canvas.Left="705" Canvas.Top="158"
                         Width="110" Height="100"
                         DeviceName="前级阀"
@@ -385,9 +400,9 @@
                         IsOpen="{Binding RightForelineValveIsOpen}"
                         IsInterlockReleased="{Binding RightForelineValveInterlockReleased}"
                         Command="{Binding ToggleRightForelineValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                        <Rectangle Canvas.Left="747" Canvas.Top="246" Width="25" Height="44" RadiusX="5" RadiusY="5"
+                                    <Rectangle Canvas.Left="747" Canvas.Top="246" Width="25" Height="44" RadiusX="5" RadiusY="5"
                             Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="3" RenderTransformOrigin="0.484,0.322" HorizontalAlignment="Center" VerticalAlignment="Top" />
-                        <controls:DryPumpControl
+                                    <controls:DryPumpControl
                         Canvas.Left="710" Canvas.Top="268"
                         Width="100" Height="100"
                         DeviceName="干泵"
@@ -395,7 +410,7 @@
                         IsRunning="{Binding DryPumpIsRunning}"
                         IsInterlockReleased="{Binding DryPumpInterlockReleased}"
                         Command="{Binding ToggleDryPumpCommand}" RenderTransformOrigin="-2.276,0.82" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <controls:ValveControl
+                                    <controls:ValveControl
                             Canvas.Left="423" Canvas.Top="349"
                             Width="101" Height="100"
                             DeviceName="前级阀"
@@ -403,100 +418,151 @@
                             IsOpen="{Binding LowerForelineValveIsOpen}"
                             IsInterlockReleased="{Binding LowerForelineValveInterlockReleased}"
                             Command="{Binding ToggleLowerForelineValveCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                    </Canvas>
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
 
-                    <!-- 系统级离线演示命令；后续由 OPC UA 命令确认流程替换。 -->
-                    <Border Width="305"
-                            Height="205"
-                            Margin="530,445,0,0"
-                            Padding="8"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            Background="#F3F6F8"
-                            BorderBrush="#AEBCC8"
-                            BorderThickness="1.5"
-                            CornerRadius="7">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="30"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="系统控制"
-                                       FontSize="19"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2D3D"
-                                       TextAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                            <UniformGrid Grid.Row="1"
-                                         Rows="3"
-                                         Columns="3">
-                                <Button Content="开启"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding SystemIsRunning}"
-                                        Command="{Binding StartSystemCommand}"/>
-                                <Button Content="停止"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding SystemIsStopped}"
-                                        Command="{Binding StopSystemCommand}"/>
-                                <Button Content="复位"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Command="{Binding ResetSystemCommand}"/>
-                                <Button Content="自动"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding AutomaticModeIsSelected}"
-                                        Command="{Binding SelectAutomaticModeCommand}"/>
-                                <Button Content="半自动"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding SemiAutomaticModeIsSelected}"
-                                        Command="{Binding SelectSemiAutomaticModeCommand}"/>
-                                <Button Content="手动"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding ManualModeIsSelected}"
-                                        Command="{Binding SelectManualModeCommand}"/>
-                                <Button Content="抽真空"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding VacuumingIsSelected}"
-                                        Command="{Binding StartVacuumCommand}"/>
-                                <Button Content="破真空"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding VentingIsSelected}"
-                                        Command="{Binding BreakVacuumCommand}"/>
-                                <Button Content="保压"
-                                        Style="{StaticResource SystemControlButtonStyle}"
-                                        Tag="{Binding PressureHoldingIsSelected}"
-                                        Command="{Binding HoldPressureCommand}"/>
-                            </UniformGrid>
-                        </Grid>
-                    </Border>
-
-                    <!-- 设备控件演示：使用右侧预留区域，不进入左侧设备画布。 -->
-                    <Border Width="567"
-                            Height="652"
-                            Margin="846,10,0,0"
+                        <!-- 系统级离线演示命令；后续由 OPC UA 命令确认流程替换。 -->
+                        <Border Grid.Column="0"
+                            Margin="0,10,0,10"
                             Padding="10"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
                             Background="#F3F6F8"
                             BorderBrush="#C6D2DC"
                             BorderThickness="1"
                             CornerRadius="8">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="28"/>
-                                <RowDefinition Height="94"/>
-                                <RowDefinition Height="130"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0"
+                                    Margin="0,0,0,6"
+                                    Padding="7"
+                                    Background="#F8FAFC"
+                                    BorderBrush="#AEBCC8"
+                                    BorderThickness="1.5"
+                                    CornerRadius="7">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="运行控制"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2D3D"
+                                               TextAlignment="Center"/>
+                                        <UniformGrid Grid.Row="1" Rows="2" Columns="2">
+                                            <Button Content="开启"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding SystemIsRunning}"
+                                                Command="{Binding StartSystemCommand}"/>
+                                            <Button Content="停止"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding SystemIsStopped}"
+                                                Command="{Binding StopSystemCommand}"/>
+                                            <Button Content="复位"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Command="{Binding ResetSystemCommand}"/>
+                                        </UniformGrid>
+                                    </Grid>
+                                </Border>
 
-                            <TextBlock Text="设备控件演示"
-                                       FontSize="21"
-                                       FontWeight="SemiBold"
-                                       Foreground="#1F2D3D"
-                                       VerticalAlignment="Center"/>
+                                <Border Grid.Row="1"
+                                    Margin="0,3"
+                                    Padding="7"
+                                    Background="#F8FAFC"
+                                    BorderBrush="#AEBCC8"
+                                    BorderThickness="1.5"
+                                    CornerRadius="7">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="运行模式"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2D3D"
+                                               TextAlignment="Center"/>
+                                        <UniformGrid Grid.Row="1" Rows="2" Columns="2">
+                                            <Button Content="自动"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding AutomaticModeIsSelected}"
+                                                Command="{Binding SelectAutomaticModeCommand}"/>
+                                            <Button Content="半自动"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding SemiAutomaticModeIsSelected}"
+                                                Command="{Binding SelectSemiAutomaticModeCommand}"/>
+                                            <Button Content="手动"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding ManualModeIsSelected}"
+                                                Command="{Binding SelectManualModeCommand}"/>
+                                        </UniformGrid>
+                                    </Grid>
+                                </Border>
 
-                            <controls:HeaterControl Grid.Row="1"
-                                                    Height="88"
-                                                    Margin="0,4,0,2"
+                                <Border Grid.Row="2"
+                                    Margin="0,6,0,0"
+                                    Padding="7"
+                                    Background="#F8FAFC"
+                                    BorderBrush="#AEBCC8"
+                                    BorderThickness="1.5"
+                                    CornerRadius="7">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="真空控制"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="#1F2D3D"
+                                               TextAlignment="Center"/>
+                                        <UniformGrid Grid.Row="1" Rows="2" Columns="2">
+                                            <Button Content="抽真空"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding VacuumingIsSelected}"
+                                                Command="{Binding StartVacuumCommand}"/>
+                                            <Button Content="破真空"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding VentingIsSelected}"
+                                                Command="{Binding BreakVacuumCommand}"/>
+                                            <Button Content="保压"
+                                                Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding PressureHoldingIsSelected}"
+                                                Command="{Binding HoldPressureCommand}"/>
+                                        </UniformGrid>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- 右侧设备控制区使用明确的纵向行布局。 -->
+                        <Border Grid.Column="4"
+                            Margin="0,10,0,10"
+                            Padding="10"
+                            Background="#F3F6F8"
+                            BorderBrush="#C6D2DC"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <!-- 右侧控件按 420×640 的设计基准整体等比缩小，避免高 DPI 下底部被裁切。 -->
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="DownOnly">
+                                <Grid Width="420"
+                                  Height="640">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="100"/>
+                                        <RowDefinition Height="132"/>
+                                        <RowDefinition Height="132"/>
+                                        <RowDefinition Height="116"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <controls:HeaterControl Grid.Row="0"
+                                                    Height="94"
+                                                    Margin="0,-9,0,15"
                                                     DisplayName="加热"
                                                     CurrentTemperature="{Binding HeaterCurrentTemperature}"
                                                     SetpointTemperature="{Binding HeaterSetpointTemperature}"
@@ -505,9 +571,8 @@
                                                     ToggleCommand="{Binding ToggleHeaterCommand}"
                                                     SetpointCommand="{Binding SetHeaterTemperatureCommand}"/>
 
-                            <controls:PowerSupplyControl Grid.Row="2"
-                                                       Height="124"
-                                                       Margin="0,4,0,2"
+                                    <controls:PowerSupplyControl
+                                                       Margin="0,90,0,10"
                                                        DisplayName="电源1"
                                                        SetpointPower="{Binding Power1Setpoint}"
                                                        MeasuredPower="{Binding Power1MeasuredPower}"
@@ -516,91 +581,10 @@
                                                        IsRunning="{Binding Power1IsRunning}"
                                                        IsInterlockReleased="{Binding Power1InterlockReleased}"
                                                        ToggleCommand="{Binding TogglePower1Command}"
-                                                       SetpointCommand="{Binding SetPower1Command}"/>
+                                                       SetpointCommand="{Binding SetPower1Command}" Grid.RowSpan="2"/>
 
-                            <Grid Grid.Row="3" Margin="0,5,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="145"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Width="140"
-                                        Height="104"
-                                        Padding="8"
-                                        HorizontalAlignment="Left"
-                                        VerticalAlignment="Top"
-                                        Background="#F8FAFC"
-                                        BorderBrush="#AEBCC8"
-                                        BorderThickness="1.5"
-                                        CornerRadius="7" Margin="-4,126,0,0">
-                                    <StackPanel>
-                                        <TextBlock
-                                                   Margin="0,0,0,8"
-                                                   FontSize="18"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#1F2D3D"
-                                                   TextAlignment="Center"><Run Language="zh-cn" Text="样品"/><Run Text="挡板"/></TextBlock>
-                                        <controls:ShutterSwitchButton Width="122"
-                                                                      Height="44"
-                                                                      DeviceName="挡板"
-                                                                      IsOn="{Binding SampleShutterIsOn}"
-                                                                      IsInterlockReleased="{Binding SampleShutterInterlockReleased}"
-                                                                      Command="{Binding ToggleSampleShutterCommand}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Width="140"
-                                    Height="104"
-                                    Padding="8"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Background="#F8FAFC"
-                                    BorderBrush="#AEBCC8"
-                                    BorderThickness="1.5"
-                                    CornerRadius="7" Grid.ColumnSpan="2" Grid.Column="1" Margin="0,126,0,0">
-                                    <StackPanel>
-                                        <TextBlock Text="靶1挡板"
-                                            Margin="0,0,0,8"
-                                            FontSize="18"
-                                            FontWeight="SemiBold"
-                                            Foreground="#1F2D3D"
-                                            TextAlignment="Center"/>
-                                        <controls:ShutterSwitchButton Width="122"
-                                            Height="44"
-                                            DeviceName="挡板"
-                                            IsOn="{Binding Target1ShutterIsOn}"
-                                            IsInterlockReleased="{Binding Target1ShutterInterlockReleased}"
-                                            Command="{Binding ToggleTarget1ShutterCommand}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Width="140"
-                                    Height="104"
-                                    Padding="8"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Background="#F8FAFC"
-                                    BorderBrush="#AEBCC8"
-                                    BorderThickness="1.5"
-                                    CornerRadius="7" Margin="142,126,0,0" Grid.Column="2">
-                                    <StackPanel>
-                                        <TextBlock Text="靶2挡板"
-                                            Margin="0,0,0,8"
-                                            FontSize="18"
-                                            FontWeight="SemiBold"
-                                            Foreground="#1F2D3D"
-                                            TextAlignment="Center"/>
-                                        <controls:ShutterSwitchButton Width="122"
-                                            Height="44"
-                                            DeviceName="挡板"
-                                            IsOn="{Binding Target2ShutterIsOn}"
-                                            IsInterlockReleased="{Binding Target2ShutterInterlockReleased}"
-                                            Command="{Binding ToggleTarget2ShutterCommand}"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                            <controls:PowerSupplyControl Grid.Row="3"
-                                Height="124"
-                                Margin="0,3,0,254"
+                                    <controls:PowerSupplyControl Grid.Row="1"
+                                Margin="0,128,0,5"
                                 DisplayName="电源2"
                                 SetpointPower="{Binding Power2Setpoint}"
                                 MeasuredPower="{Binding Power2MeasuredPower}"
@@ -609,13 +593,89 @@
                                 IsRunning="{Binding Power2IsRunning}"
                                 IsInterlockReleased="{Binding Power2InterlockReleased}"
                                 ToggleCommand="{Binding TogglePower2Command}"
-                                SetpointCommand="{Binding SetPower2Command}"/>
+                                SetpointCommand="{Binding SetPower2Command}" Grid.RowSpan="2"/>
 
-                            <Grid Grid.Row="3"
-                                  Height="146"
-                                  Margin="0,0,0,2"
-                                  VerticalAlignment="Bottom">
-                                <controls:SampleStageSpeedControl
+                                    <Grid Grid.Row="3" Margin="0,0,0,21">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140*"/>
+                                            <ColumnDefinition Width="4"/>
+                                            <ColumnDefinition Width="140*"/>
+                                            <ColumnDefinition Width="9"/>
+                                            <ColumnDefinition Width="140*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0"
+                                        Padding="8"
+                                        Background="#F8FAFC"
+                                        BorderBrush="#AEBCC8"
+                                        BorderThickness="1.5"
+                                        CornerRadius="7">
+                                            <StackPanel>
+                                                <TextBlock Text="样品挡板"
+                                                   Margin="0,0,0,8"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#1F2D3D"
+                                                   TextAlignment="Center"/>
+                                                <controls:ShutterSwitchButton Width="120"
+                                                                      Height="45"
+                                                                      HorizontalAlignment="Center"
+                                                                      DeviceName="挡板"
+                                                                      IsOn="{Binding SampleShutterIsOn}"
+                                                                      IsInterlockReleased="{Binding SampleShutterInterlockReleased}"
+                                                                      Command="{Binding ToggleSampleShutterCommand}"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2"
+                                        Padding="8"
+                                        Background="#F8FAFC"
+                                        BorderBrush="#AEBCC8"
+                                        BorderThickness="1.5"
+                                        CornerRadius="7">
+                                            <StackPanel>
+                                                <TextBlock Text="靶1挡板"
+                                                   Margin="0,0,0,8"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#1F2D3D"
+                                                   TextAlignment="Center"/>
+                                                <controls:ShutterSwitchButton Width="120"
+                                                                      Height="45"
+                                                                      HorizontalAlignment="Center"
+                                                                      DeviceName="挡板"
+                                                                      IsOn="{Binding Target1ShutterIsOn}"
+                                                                      IsInterlockReleased="{Binding Target1ShutterInterlockReleased}"
+                                                                      Command="{Binding ToggleTarget1ShutterCommand}"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="4"
+                                        Padding="8"
+                                        Background="#F8FAFC"
+                                        BorderBrush="#AEBCC8"
+                                        BorderThickness="1.5"
+                                        CornerRadius="7">
+                                            <StackPanel>
+                                                <TextBlock Text="靶2挡板"
+                                                   Margin="0,0,0,8"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#1F2D3D"
+                                                   TextAlignment="Center"/>
+                                                <controls:ShutterSwitchButton Width="120"
+                                                                      Height="45"
+                                                                      HorizontalAlignment="Center"
+                                                                      DeviceName="挡板"
+                                                                      IsOn="{Binding Target2ShutterIsOn}"
+                                                                      IsInterlockReleased="{Binding Target2ShutterInterlockReleased}"
+                                                                      Command="{Binding ToggleTarget2ShutterCommand}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <Grid Grid.Row="4" Margin="0">
+                                        <controls:SampleStageSpeedControl
                                     DisplayName="样品台转速"
                                     CurrentSpeed="{Binding SampleStageCurrentSpeed}"
                                     SetpointSpeed="{Binding SampleStageSetpointSpeed}"
@@ -624,13 +684,14 @@
                                     Unit="rpm"
                                     SetpointCommand="{Binding SetSampleStageSpeedCommand}"
                                     ForwardCommand="{Binding StartSampleStageForwardCommand}"
-                                    ReverseCommand="{Binding StartSampleStageReverseCommand}"/>
-                            </Grid>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Viewbox>
-            </Border>
+                                    ReverseCommand="{Binding StartSampleStageReverseCommand}" Margin="0,-19,0,-9"/>
+                                    </Grid>
+                                </Grid>
+                            </Viewbox>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
         </controls:HmiPageLayout.PageContent>
     </controls:HmiPageLayout>
 </Page>

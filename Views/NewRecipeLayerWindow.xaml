@@ -2,118 +2,185 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="新建配方层"
-        Width="650"
-        Height="760"
-        MinWidth="580"
+        Width="1280"
+        Height="670"
+        MinWidth="1120"
         MinHeight="620"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="#EEF2F5">
     <Window.Resources>
         <DataTemplate x:Key="ParameterInputTemplate">
-            <Grid Margin="0,4">
+            <Grid Margin="0,5">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="145"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="60"/>
+                    <ColumnDefinition Width="105"/>
+                    <ColumnDefinition Width="125"/>
+                    <ColumnDefinition Width="48"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center"
-                           FontSize="15"
+                           FontSize="14"
                            Text="{Binding Label}"/>
                 <TextBox Grid.Column="1"
                          Height="32"
-                         Padding="8,4"
+                         Padding="7,4"
                          VerticalContentAlignment="Center"
-                         FontSize="15"
+                         FontSize="14"
                          Text="{Binding ValueText, UpdateSourceTrigger=PropertyChanged}"/>
                 <TextBlock Grid.Column="2"
-                           Margin="8,0,0,0"
+                           Margin="7,0,0,0"
                            VerticalAlignment="Center"
                            Foreground="#526777"
                            Text="{Binding Unit}"/>
                 <TextBlock Grid.Column="3"
                            VerticalAlignment="Center"
                            Foreground="#C45A00"
-                           FontSize="12"
+                           FontSize="11"
                            Text="{Binding Hint}"
                            TextWrapping="Wrap"/>
             </Grid>
         </DataTemplate>
 
         <Style x:Key="GroupBorderStyle" TargetType="Border">
-            <Setter Property="Margin" Value="0,0,0,12"/>
-            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Margin" Value="6"/>
+            <Setter Property="Padding" Value="16,14"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CDD9E2"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="7"/>
         </Style>
+
+        <Style x:Key="ModuleTitleStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#1D5D88"/>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="18">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Margin="4,0,4,14">
+        <StackPanel Margin="4,0,4,8">
             <TextBlock HorizontalAlignment="Center"
-                       FontSize="28"
+                       FontSize="27"
                        FontWeight="SemiBold"
                        Foreground="#1F2D3D"
                        Text="新建配方层"/>
-            <TextBlock Margin="0,8,0,0"
-                       HorizontalAlignment="Center"
-                       FontSize="16"
-                       Foreground="#526777"
-                       Text="{Binding Sequence, StringFormat=序号：{0}}"/>
+            <StackPanel Margin="0,4,0,0"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="15"
+                           Foreground="#526777"
+                           Text="插入序号："/>
+                <TextBox Width="64"
+                         Height="28"
+                         Padding="6,2"
+                         VerticalContentAlignment="Center"
+                         FontSize="15"
+                         Text="{Binding SequenceText, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Margin="8,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           Foreground="#758A99"
+                           Text="{Binding MaximumSequence, StringFormat=可输入 1-{0}，默认追加到末层}"/>
+            </StackPanel>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="2">
-                <Border Style="{StaticResource GroupBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Margin="0,0,0,8"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1D5D88"
-                                   Text="功率、时间与运动"/>
-                        <ItemsControl ItemsSource="{Binding PowerAndTimeInputs}"
-                                      ItemTemplate="{StaticResource ParameterInputTemplate}"/>
-                    </StackPanel>
-                </Border>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1.12*"/>
+            </Grid.ColumnDefinitions>
 
-                <Border Style="{StaticResource GroupBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Margin="0,0,0,8"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1D5D88"
-                                   Text="工艺气体"/>
-                        <ItemsControl ItemsSource="{Binding GasInputs}"
-                                      ItemTemplate="{StaticResource ParameterInputTemplate}"/>
-                    </StackPanel>
-                </Border>
+            <Border Style="{StaticResource GroupBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource ModuleTitleStyle}"
+                               Text="功率、时间与运动"/>
+                    <ItemsControl ItemsSource="{Binding PowerAndTimeInputs}"
+                                  ItemTemplate="{StaticResource ParameterInputTemplate}"/>
+                </StackPanel>
+            </Border>
 
-                <Border Style="{StaticResource GroupBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Margin="0,0,0,8"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="#1D5D88"
-                                   Text="气压与 APC"/>
-                        <ItemsControl ItemsSource="{Binding PressureAndApcInputs}"
-                                      ItemTemplate="{StaticResource ParameterInputTemplate}"/>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
+            <Border Grid.Column="1"
+                    Style="{StaticResource GroupBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource ModuleTitleStyle}"
+                               Text="工艺气体"/>
+                    <ItemsControl ItemsSource="{Binding GasInputs}"
+                                  ItemTemplate="{StaticResource ParameterInputTemplate}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Style="{StaticResource GroupBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource ModuleTitleStyle}"
+                               Text="气压与 APC"/>
+                    <Border Margin="0,0,0,10"
+                            Padding="10,8"
+                            Background="#EDF6FC"
+                            CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Margin="0,0,0,7"
+                                       Foreground="#334A5F"
+                                       Text="选择控制方式（未选中的参数不赋值）"/>
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Margin="0,0,26,0"
+                                             FontSize="15"
+                                             FontWeight="SemiBold"
+                                             Content="控压模式"
+                                             IsChecked="{Binding IsPressureMode}"/>
+                                <RadioButton FontSize="15"
+                                             FontWeight="SemiBold"
+                                             Content="定位模式"
+                                             IsChecked="{Binding IsApcMode}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="10,5"
+                            BorderBrush="#DCE5EB"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            IsEnabled="{Binding IsPressureMode}">
+                        <StackPanel>
+                            <TextBlock Margin="0,2,0,4"
+                                       FontWeight="SemiBold"
+                                       Foreground="#245D7D"
+                                       Text="控压参数"/>
+                            <ItemsControl ItemsSource="{Binding PressureInputs}"
+                                          ItemTemplate="{StaticResource ParameterInputTemplate}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,10,0,0"
+                            Padding="10,5"
+                            BorderBrush="#DCE5EB"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            IsEnabled="{Binding IsApcMode}">
+                        <StackPanel>
+                            <TextBlock Margin="0,2,0,4"
+                                       FontWeight="SemiBold"
+                                       Foreground="#245D7D"
+                                       Text="定位参数"/>
+                            <ItemsControl ItemsSource="{Binding ApcInputs}"
+                                          ItemTemplate="{StaticResource ParameterInputTemplate}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <StackPanel Grid.Row="2"
-                    Margin="0,14,0,0"
+                    Margin="0,10,6,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
             <Button Width="100"

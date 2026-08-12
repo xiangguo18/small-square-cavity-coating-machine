@@ -109,6 +109,28 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         RefreshCommandStates();
     }
 
+    [RelayCommand(CanExecute = nameof(CanClearRecipe))]
+    private void ClearRecipe()
+    {
+        if (!EnsureCanOperate())
+        {
+            return;
+        }
+
+        if (!_dialogService.ConfirmClearRecipe())
+        {
+            return;
+        }
+
+        ClearCurrentHighlight();
+        Layers.Clear();
+        _selectedLayers.Clear();
+        LoadedFileName = string.Empty;
+        _applicationStatus.RecipeStatusText = string.Empty;
+        Log("清除配方", "清除全部配方层", true, string.Empty);
+        RefreshCommandStates();
+    }
+
     [RelayCommand(CanExecute = nameof(CanImportOrCreate))]
     private void NewRecipeLayer()
     {
@@ -124,10 +146,17 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
             return;
         }
 
-        Layers.Add(layer);
+        InsertLayerAndShiftFollowing(layer);
+        _selectedLayers.Clear();
         LoadedFileName = string.Empty;
         _applicationStatus.RecipeStatusText = string.Empty;
-        Log("新建配方层", $"序号 {layer.Sequence}", true, string.Empty);
+        Log(
+            "新建配方层",
+            layer.Sequence == nextSequence
+                ? $"追加序号 {layer.Sequence}"
+                : $"插入序号 {layer.Sequence}，后续层已顺延",
+            true,
+            string.Empty);
         RefreshCommandStates();
     }
 
@@ -143,7 +172,10 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 
     private bool CanImportOrCreate() => !IsRunning;
 
-    private bool CanSendAll() => !IsRunning && _plcGateway.IsAvailable && Layers.Count > 0;
+    private bool CanClearRecipe() => !IsRunning && Layers.Count > 0;
+
+    private bool CanSendAll() =>
+        !IsRunning && _plcGateway.IsAvailable && Layers.Count > 0;
 
     private bool CanSendSelected()
         => !IsRunning && _plcGateway.IsAvailable && _selectedLayers.Count > 0;
@@ -262,6 +294,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     private void RefreshCommandStates()
     {
         ImportRecipeCommand.NotifyCanExecuteChanged();
+        ClearRecipeCommand.NotifyCanExecuteChanged();
         NewRecipeLayerCommand.NotifyCanExecuteChanged();
         SendAllCommand.NotifyCanExecuteChanged();
         SendSelectedCommand.NotifyCanExecuteChanged();
@@ -284,6 +317,27 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         {
             layer.IsCurrent = false;
         }
+    }
+
+    private void InsertLayerAndShiftFollowing(RecipeLayer newLayer)
+    {
+        for (var index = Layers.Count - 1; index >= 0; index--)
+        {
+            var existing = Layers[index];
+            if (existing.Sequence >= newLayer.Sequence)
+            {
+                Layers[index] = existing.CopyWithSequence(existing.Sequence + 1);
+            }
+        }
+
+        var insertionIndex = 0;
+        while (insertionIndex < Layers.Count
+               && Layers[insertionIndex].Sequence < newLayer.Sequence)
+        {
+            insertionIndex++;
+        }
+
+        Layers.Insert(insertionIndex, newLayer);
     }
 
     private void Log(string target, string action, bool successful, string failureReason)

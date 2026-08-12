@@ -2,6 +2,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Small_square_cavity_coating_machine.Models.Recipes;
 
+public enum RecipePressureControlMode
+{
+    ImportedValues,
+    Pressure,
+    ApcPosition
+}
+
 /// <summary>
 /// 单层工艺参数。属性顺序与 Excel A-S 列以及后续 PLC 参数块保持一致。
 /// </summary>
@@ -48,14 +55,22 @@ public sealed partial class RecipeLayer : ObservableObject
 
     public double WorkingApcPercent { get; init; }
 
+    /// <summary>
+    /// 新建配方层时选择的控压方式。真实 PLC 网关应只操作所选模式对应的两个点位。
+    /// Excel 导入层使用 ImportedValues，继续按 A-S 原始数据完整下发。
+    /// </summary>
+    public RecipePressureControlMode PressureControlMode { get; init; }
+
     [ObservableProperty]
     private bool isCurrent;
 
-    public RecipeLayer Snapshot()
+    public RecipeLayer Snapshot() => CopyWithSequence(Sequence);
+
+    public RecipeLayer CopyWithSequence(int sequence)
     {
         return new RecipeLayer
         {
-            Sequence = Sequence,
+            Sequence = sequence,
             CathodeAPower = CathodeAPower,
             CathodeBPower = CathodeBPower,
             PowerSpan = PowerSpan,
@@ -73,7 +88,8 @@ public sealed partial class RecipeLayer : ObservableObject
             IgnitionPressurePa = IgnitionPressurePa,
             WorkingPressurePa = WorkingPressurePa,
             IgnitionApcPercent = IgnitionApcPercent,
-            WorkingApcPercent = WorkingApcPercent
+            WorkingApcPercent = WorkingApcPercent,
+            PressureControlMode = PressureControlMode
         };
     }
 }
