@@ -69,27 +69,31 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="78"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="48"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="设定流量"
                                Foreground="#37474F"
                                FontSize="17"
                                VerticalAlignment="Center"
                                Margin="8,0,0,0"/>
-                    <TextBlock Grid.Column="1"
+                    <TextBox x:Name="SetpointTextBox"
+                             Grid.Column="1"
+                             Height="30"
+                             Padding="3,0"
+                             BorderBrush="#90A4AE"
+                             FontSize="15"
+                             FontWeight="SemiBold"
+                             Text="{Binding SetpointFlow, ElementName=Root, Mode=OneWay, StringFormat={}{0:0.0}}"
+                             HorizontalContentAlignment="Right"
+                             VerticalContentAlignment="Center"
+                             PreviewKeyDown="SetpointTextBox_PreviewKeyDown"
+                             LostKeyboardFocus="SetpointTextBox_LostKeyboardFocus"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Unit, ElementName=Root}"
                                Foreground="#263238"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               TextAlignment="Right"
+                               FontSize="14"
                                VerticalAlignment="Center"
-                               Margin="0,0,8,0">
-                        <TextBlock.Text>
-                            <MultiBinding Converter="{StaticResource NumericValueConverter}">
-                                <Binding Path="SetpointFlow" ElementName="Root"/>
-                                <Binding Path="ValueFormat" ElementName="Root"/>
-                                <Binding Path="Unit" ElementName="Root"/>
-                            </MultiBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
+                               Margin="4,0,4,0"/>
                 </Grid>
             </Grid>
         </Border>

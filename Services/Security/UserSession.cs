@@ -75,6 +75,8 @@ public sealed class AuthorizationService : IAuthorizationService
 
     public string CurrentUserName => _session.CurrentUser?.UserName ?? "未登录";
 
+    public bool IsBuiltInAdministrator => _session.CurrentUser?.IsBuiltInAdministrator == true;
+
     public bool CanOperate(PermissionKey permission) =>
         _session.CurrentUser?.HasPermission(permission) == true;
 

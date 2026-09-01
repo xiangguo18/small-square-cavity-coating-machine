@@ -1,0 +1,369 @@
+using Small_square_cavity_coating_machine.Models.Equipment;
+using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Services.Alarms;
+using Small_square_cavity_coating_machine.Services.Equipment;
+using Small_square_cavity_coating_machine.Services.Security;
+using Small_square_cavity_coating_machine.ViewModels;
+using System.Security.Cryptography;
+using Microsoft.Data.Sqlite;
+using Xunit;
+
+namespace Small_square_cavity_coating_machine.Tests;
+
+public sealed class ControlBindingFeatureTests
+{
+    private sealed class Authorization : IAuthorizationService
+    {
+        public bool Allowed = true;
+        public bool IsBuiltInAdministrator { get; set; } = true;
+        public string CurrentUserName => "slkj";
+        public event EventHandler? AccessChanged { add { } remove { } }
+        public event EventHandler<AuthorizationDeniedEventArgs>? AccessDenied { add { } remove { } }
+        public bool CanOperate(PermissionKey permission) => Allowed;
+        public bool TryAuthorize(PermissionKey permission) => Allowed;
+    }
+
+    [Fact]
+    public void Embedded_control_definitions_match_confirmed_indices_without_duplicates()
+    {
+        using var temp = new AlarmFeatureTests.TemporaryDirectory();
+        var path = SqliteAlarmDefinitionRepository.ExtractEmbeddedDatabase(temp.Path);
+        var before = SHA256.HashData(File.ReadAllBytes(path));
+        var controls = new SqliteEquipmentDefinitionRepository(path).LoadControls();
+
+        Assert.Equal("Part_Command[982]", controls.Commands[982].Address);
+        Assert.DoesNotContain(983, controls.Commands.Keys);
+        Assert.Equal("Part_Command[21]", controls.Commands[21].Address);
+        Assert.Equal("Part_Command[24]", controls.Commands[24].Address);
+        Assert.Equal("Part_Data1[21]", controls.Data[21].Address);
+        Assert.Equal("Part_Data_Set2[0]", controls.Data[21].SetAddress);
+        Assert.Equal("Part_Data1[26]", controls.Data[26].Address);
+        Assert.Equal("Part_Data_Set1[1]", controls.Data[1].SetAddress);
+        Assert.Equal("Part_Data_Set1[4]", controls.Data[7].SetAddress);
+        Assert.Equal("Part_Data_Set1[5]", controls.Data[8].SetAddress);
+        Assert.Equal("Part_Data_Set1[6]", controls.Data[9].SetAddress);
+        Assert.Equal("EQ_Interlock[10]", controls.Commands[27].InterlockAddress);
+        Assert.Equal("EQ_Interlock[15]", controls.Commands[32].InterlockAddress);
+        Assert.Equal("EQ_PassInterlock", controls.SystemCommands["PassInterlock"].CommandAddress);
+        Assert.True(controls.SystemCommands["PassInterlock"].RequiresBuiltInAdministrator);
+        var expectedStates = new Dictionary<int, int>
+        {
+            [0]=0, [1]=1, [2]=2, [3]=3, [4]=4, [5]=5, [6]=6, [7]=7,
+            [11]=11, [12]=12, [13]=13, [14]=14, [15]=15, [16]=16,
+            [17]=17, [18]=18, [19]=19, [20]=20, [21]=21, [22]=22, [23]=23, [24]=24, [25]=25
+        };
+        Assert.All(expectedStates, pair => Assert.Equal($"Part_State[{pair.Value}]", controls.Parts[pair.Key].StateAddress));
+        Assert.DoesNotContain(controls.Parts.Keys, id => id is >= 100 and <= 110);
+        Assert.Equal(5, controls.Commands[13].PartId);
+        Assert.Equal(24, controls.Commands[15].PartId);
+        Assert.Equal(25, controls.Commands[17].PartId);
+        Assert.Equal(6, controls.Commands[21].PartId);
+        Assert.Equal(7, controls.Commands[23].PartId);
+        Assert.Equal([11,12,15,14,13,16], new[] {27,29,31,33,35,37}.Select(id => controls.Commands[id].PartId));
+        var partStateAddresses = controls.Parts.Values.Select(p => p.StateAddress).Where(a => a.Length > 0).ToArray();
+        Assert.Equal(partStateAddresses.Length, partStateAddresses.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(controls.Addresses.Count, controls.Addresses.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(before, SHA256.HashData(File.ReadAllBytes(path)));
+    }
+
+    [Fact]
+    public void Duplicate_part_state_address_is_rejected_instead_of_guessed()
+    {
+        using var temp = new AlarmFeatureTests.TemporaryDirectory();
+        var path = SqliteAlarmDefinitionRepository.ExtractEmbeddedDatabase(temp.Path);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Pooling = false
+        }.ToString();
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Part SET Node='Part_State[0]' WHERE Id=1";
+            command.ExecuteNonQuery();
+        }
+        Assert.Throws<InvalidOperationException>(() => new SqliteEquipmentDefinitionRepository(path).LoadControls());
+    }
+
+    [Fact]
+    public async Task Commands_write_true_once_never_clear_opposite_and_honor_enable_and_interlock()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var first = await harness.Service.ExecutePartCommandAsync(13, "样品挡板", "开启");
+        var second = await harness.Service.ExecutePartCommandAsync(14, "样品挡板", "关闭");
+
+        Assert.Equal(ControlWriteOutcome.Confirmed, first.Outcome);
+        Assert.Equal(ControlWriteOutcome.Confirmed, second.Outcome);
+        Assert.Collection(harness.Session.ControlWrites.Take(2),
+            write => { Assert.Equal((EquipmentGroups.PartCommand, 13), (write.Group, write.Index)); Assert.Equal(true, write.Value); },
+            write => { Assert.Equal((EquipmentGroups.PartCommand, 14), (write.Group, write.Index)); Assert.Equal(true, write.Value); });
+        Assert.True(((bool[])harness.Session.Values[EquipmentGroups.PartCommand])[13]);
+        Assert.True(((bool[])harness.Session.Values[EquipmentGroups.PartCommand])[14]);
+        Assert.DoesNotContain(harness.Session.ControlWrites, write => write.Value is false);
+
+        ((bool[])harness.Session.Values[EquipmentGroups.PartCommandEnable])[15] = false;
+        harness.Session.Send(EquipmentGroups.PartCommandEnable);
+        var disabled = await harness.Service.ExecutePartCommandAsync(15, "靶1挡板", "开启");
+        Assert.Equal(ControlWriteOutcome.Rejected, disabled.Outcome);
+        Assert.DoesNotContain(harness.Session.ControlWrites, write => write.Index == 15);
+
+        ((bool[])harness.Session.Values[EquipmentGroups.Interlock])[10] = false;
+        harness.Session.Send(EquipmentGroups.Interlock);
+        var blocked = await harness.Service.ExecutePartCommandAsync(27, "Ar气阀", "开启");
+        Assert.Equal(ControlWriteOutcome.Rejected, blocked.Outcome);
+
+        Assert.Equal(ControlWriteOutcome.Confirmed, (await harness.Service.SetPassInterlockAsync(true)).Outcome);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(27, "Ar气阀", "开启")).Outcome);
+        Assert.Contains(harness.Session.ControlWrites,
+            write => write.Group == EquipmentGroups.PassInterlock && write.Index is null && Equals(write.Value, true));
+        Assert.Contains(harness.Session.ControlWrites,
+            write => write.Group == EquipmentGroups.PartCommand && write.Index == 27 && Equals(write.Value, true));
+    }
+
+    [Fact]
+    public async Task Setpoints_are_database_driven_and_all_confirmed_state_words_drive_feedback()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.WriteSetpointAsync(1, 0, PermissionKey.SystemStatus)).Outcome);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.WriteSetpointAsync(1, 42.5, PermissionKey.SystemStatus)).Outcome);
+        Assert.Equal([0f, 42.5f], harness.Session.ControlWrites
+            .Where(w => w.Group == EquipmentGroups.PartDataSet1 && w.Index == 1)
+            .Select(w => Assert.IsType<float>(w.Value)).ToArray());
+
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+        states[0] = 1 << 1;
+        states[1] = (1 << 1) | (1 << 7);
+        states[2] = 1 << 1;
+        states[4] = 1 << 1;
+        states[5] = 1 << 1;
+        states[6] = (1 << 1) | (1 << 7);
+        states[7] = 1 << 0;
+        states[11] = 1 << 1;
+        states[12] = 1 << 0;
+        states[13] = 1 << 1;
+        states[14] = 1 << 7;
+        states[15] = 1 << 1;
+        states[16] = 1 << 0;
+        states[17] = 1 << 1;
+        states[18] = 1 << 7;
+        states[19] = 1 << 1;
+        states[20] = 1 << 1;
+        states[21] = 1 << 0;
+        states[24] = 1 << 1;
+        states[25] = 1 << 7;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.True(viewModel.DryPumpIsRunning);
+        Assert.True(viewModel.TurboPumpIsRunning);
+        Assert.True(viewModel.TurboPumpIsFaulted);
+        Assert.True(viewModel.ApcIsOpen);
+        Assert.True(viewModel.SampleStageIsRunning);
+        Assert.True(viewModel.SampleShutterIsOn);
+        Assert.True(viewModel.Power1IsRunning);
+        Assert.True(viewModel.Power1IsFaulted);
+        Assert.False(viewModel.Power2IsRunning);
+        Assert.True(viewModel.ArgonLowerValveIsOpen);
+        Assert.False(viewModel.ArgonUpperValveIsOpen);
+        Assert.True(viewModel.NitrogenLowerValveIsOpen);
+        Assert.True(viewModel.NitrogenUpperValveIsFaulted);
+        Assert.True(viewModel.OxygenLowerValveIsOpen);
+        Assert.False(viewModel.OxygenUpperValveIsOpen);
+        Assert.True(viewModel.ForelineGaugeIsReadingEnabled);
+        Assert.True(viewModel.HighVacuumGaugeIsFaulted);
+        Assert.True(viewModel.FilmGaugeIsReadingEnabled);
+        Assert.True(viewModel.FilmGaugeValveIsOpen);
+        Assert.False(viewModel.BypassValveIsOpen);
+        Assert.True(viewModel.Target1ShutterIsOn);
+        Assert.True(viewModel.Target2ShutterIsFaulted);
+
+        states[11] = (1 << 0) | (1 << 1); // contradictory position bits are unknown, never green
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.False(viewModel.ArgonLowerValveIsOpen);
+        harness.Session.Send(EquipmentGroups.PartState, Opc.Ua.StatusCodes.BadCommunicationError);
+        Assert.False(viewModel.SampleStageIsRunning);
+        Assert.False(viewModel.Power1IsRunning);
+        Assert.False(viewModel.ForelineGaugeIsReadingEnabled);
+        Assert.False(viewModel.Target1ShutterIsOn);
+
+        harness.Session.Values[EquipmentGroups.PartState] = new ushort[10];
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.False(viewModel.Target2ShutterIsOn);
+        Assert.False(viewModel.Target2ShutterIsFaulted);
+    }
+
+    [Fact]
+    public async Task Mfc_commands_write_confirmed_values_to_the_three_configured_setpoint_elements()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.SetArgonFlowCommand.Execute(12.3d);
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Count >= 1);
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
+        viewModel.SetNitrogenFlowCommand.Execute(23.4d);
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Count >= 2);
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
+        viewModel.SetOxygenFlowCommand.Execute(34.5d);
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Count >= 3);
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
+
+        Assert.Equal(
+            [
+                (EquipmentGroups.PartDataSet1, (int?)4, 12.3f),
+                (EquipmentGroups.PartDataSet1, (int?)5, 23.4f),
+                (EquipmentGroups.PartDataSet1, (int?)6, 34.5f)
+            ],
+            harness.Session.ControlWrites.Select(write =>
+                (write.Group, write.Index, Assert.IsType<float>(write.Value))).ToArray());
+        await AlarmArrayConnectionTests.Until(() => Math.Abs(viewModel.OxygenSetpointFlow - 34.5d) < 0.001d);
+        Assert.Equal(12.3d, viewModel.ArgonSetpointFlow, 3);
+        Assert.Equal(23.4d, viewModel.NitrogenSetpointFlow, 3);
+
+        var writeCount = harness.Session.ControlWrites.Count;
+        Assert.Equal(ControlWriteOutcome.Rejected,
+            (await harness.Service.WriteSetpointAsync(7, 500.1d, PermissionKey.SystemStatus)).Outcome);
+        Assert.Equal(writeCount, harness.Session.ControlWrites.Count);
+
+        harness.Authorization.Allowed = false;
+        viewModel.SetArgonFlowCommand.Execute(40d);
+        await Task.Delay(100);
+        Assert.Equal(writeCount, harness.Session.ControlWrites.Count);
+    }
+
+    [Fact]
+    public async Task Workflow_buttons_toggle_only_after_confirmed_true_write_and_remain_mutually_exclusive()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.StartVacuumCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.VacuumingIsSelected);
+        Assert.False(viewModel.VentingIsSelected);
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == EquipmentGroups.PartCommand && w.Index == 980 && Equals(w.Value, true));
+
+        viewModel.BreakVacuumCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.VentingIsSelected);
+        Assert.False(viewModel.VacuumingIsSelected);
+
+        viewModel.BreakVacuumCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => !viewModel.VentingIsSelected);
+        Assert.Equal(2, harness.Session.ControlWrites.Count(w => w.Group == EquipmentGroups.PartCommand && w.Index == 981));
+        Assert.DoesNotContain(harness.Session.ControlWrites, w => w.Value is false);
+
+        ((bool[])harness.Session.Values[EquipmentGroups.PartCommandEnable])[982] = false;
+        harness.Session.Send(EquipmentGroups.PartCommandEnable);
+        viewModel.HoldPressureCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ControlStatusText.Contains("未使能"));
+        Assert.False(viewModel.PressureHoldingIsSelected);
+    }
+
+    [Fact]
+    public async Task Component_toggle_chooses_open_or_close_from_real_feedback_without_optimistic_color()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+
+        states[5] = 1 << 1;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.True(viewModel.SampleShutterIsOn);
+        viewModel.ToggleSampleShutterCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Any(w => w.Index == 14));
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
+        Assert.True(viewModel.SampleShutterIsOn); // waits for Part_State, never follows command success optimistically
+
+        states[5] = 1 << 0;
+        harness.Session.Send(EquipmentGroups.PartState);
+        viewModel.ToggleSampleShutterCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Any(w => w.Index == 13));
+        Assert.False(viewModel.SampleShutterIsOn);
+        Assert.All(harness.Session.ControlWrites.Where(w => w.Index is 13 or 14), w => Assert.Equal(true, w.Value));
+    }
+
+    [Fact]
+    public async Task Simulated_apc_position_updates_the_same_confirmed_state_used_by_the_view_model()
+    {
+        using var temp = new AlarmFeatureTests.TemporaryDirectory();
+        var path = SqliteAlarmDefinitionRepository.ExtractEmbeddedDatabase(temp.Path);
+        var parameters = new SqliteEquipmentDefinitionRepository(path).LoadParameters();
+        var factory = new SimulatedEquipmentSessionFactory(parameters);
+        await using var session = await factory.ConnectAsync(new OpcUaAlarmOptions(), CancellationToken.None);
+
+        await session.WriteElementAsync(EquipmentGroups.PartDataSet1, 1, 0f, CancellationToken.None);
+        var closed = Assert.IsType<ushort[]>((await session.ReadGroupAsync(
+            EquipmentGroups.PartState, null, CancellationToken.None)).Value);
+        Assert.Equal((ushort)1, closed[2]);
+
+        await session.WriteElementAsync(EquipmentGroups.PartDataSet1, 1, 37.5f, CancellationToken.None);
+        var open = Assert.IsType<ushort[]>((await session.ReadGroupAsync(
+            EquipmentGroups.PartState, null, CancellationToken.None)).Value);
+        Assert.Equal((ushort)2, open[2]);
+    }
+
+    private sealed class ControlHarness : IAsyncDisposable
+    {
+        private readonly AlarmFeatureTests.TemporaryDirectory _temp;
+        public EquipmentFeatureTests.Session Session { get; }
+        public EquipmentFeatureTests.Runtime Runtime { get; }
+        public Authorization Authorization { get; }
+        public OpcUaEquipmentClient Client { get; }
+        public EquipmentControlService Service { get; }
+
+        private ControlHarness(AlarmFeatureTests.TemporaryDirectory temp, EquipmentFeatureTests.Session session,
+            EquipmentFeatureTests.Runtime runtime, Authorization authorization, OpcUaEquipmentClient client,
+            EquipmentControlService service)
+        {
+            _temp = temp; Session = session; Runtime = runtime; Authorization = authorization;
+            Client = client; Service = service;
+        }
+
+        public static async Task<ControlHarness> CreateAsync()
+        {
+            var temp = new AlarmFeatureTests.TemporaryDirectory();
+            var path = SqliteAlarmDefinitionRepository.ExtractEmbeddedDatabase(temp.Path);
+            var repository = new SqliteEquipmentDefinitionRepository(path);
+            var alarms = new SqliteAlarmDefinitionRepository(path).Load();
+            var controls = repository.LoadControls();
+            var session = new EquipmentFeatureTests.Session();
+            var runtime = new EquipmentFeatureTests.Runtime(Path.Combine(temp.Path, "control-runtime.db"));
+            var authorization = new Authorization();
+            var settings = new AlarmArrayConnectionTests.Settings
+            {
+                Options = new() { EndpointUrl = "opc.tcp://127.0.0.1:4841", ReconnectDelayMs = 1000 }
+            };
+            var client = new OpcUaEquipmentClient(settings, new EquipmentFeatureTests.Factory(session), alarms,
+                repository.LoadIo(), repository.LoadParameters(), authorization, runtime,
+                controlDefinitions: controls);
+            var service = new EquipmentControlService(client, controls);
+            try
+            {
+                await client.StartAsync(CancellationToken.None);
+                await AlarmArrayConnectionTests.Until(() => client.Snapshot().IsConnected);
+                return new(temp, session, runtime, authorization, client, service);
+            }
+            catch
+            {
+                service.Dispose();
+                await client.DisposeAsync();
+                temp.Dispose();
+                throw;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Service.Dispose();
+            await Client.DisposeAsync();
+            _temp.Dispose();
+        }
+    }
+}

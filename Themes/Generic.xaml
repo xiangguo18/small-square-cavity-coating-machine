@@ -7,7 +7,8 @@
     <SolidColorBrush x:Key="DeviceIdleBrush" Color="#F8FAFC"/>
     <SolidColorBrush x:Key="DeviceActiveBrush" Color="#55C878"/>
     <SolidColorBrush x:Key="DeviceFaultBrush" Color="#EF5350"/>
-    <SolidColorBrush x:Key="PipeBodyBrush" Color="#B8C2CC"/>
+    <!-- 停流时仅保留两侧管壁轮廓；蓝色虚线作为独立流动层显示。 -->
+    <SolidColorBrush x:Key="PipeBodyBrush" Color="#00B8C2CC"/>
     <SolidColorBrush x:Key="PipeFlowBrush" Color="#147BD1"/>
     <controls:VerticalTextConverter x:Key="VerticalTextConverter"/>
     <controls:PercentageToRatioConverter x:Key="PercentageToRatioConverter"/>
@@ -261,6 +262,9 @@
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
                         </Trigger>
+                        <Trigger Property="ShowInterlockIndicator" Value="False">
+                            <Setter TargetName="InterlockLamp" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                         <Trigger Property="IsFaulted" Value="True">
                             <Setter TargetName="ValveBodyTop" Property="Fill"
                                     Value="{StaticResource DeviceFaultBrush}"/>
@@ -396,6 +400,9 @@
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
                         </Trigger>
+                        <Trigger Property="ShowInterlockIndicator" Value="False">
+                            <Setter TargetName="InterlockLamp" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                         <Trigger Property="IsFaulted" Value="True">
                             <Setter TargetName="PumpBody" Property="Fill"
                                     Value="{StaticResource DeviceFaultBrush}"/>
@@ -520,6 +527,9 @@
                         </Trigger>
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
+                        </Trigger>
+                        <Trigger Property="ShowInterlockIndicator" Value="False">
+                            <Setter TargetName="InterlockLamp" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="IsFaulted" Value="True">
                             <Setter TargetName="PumpBody" Property="Fill"

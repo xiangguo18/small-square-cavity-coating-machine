@@ -1,0 +1,8 @@
+{
+  "Enabled": true,
+  "EndpointUrl": "opc.tcp://192.168.0.10:4840",
+  "ArrayBrowseName": "EQ_Alarm",
+  "SamplingIntervalMs": 100,
+  "PublishingIntervalMs": 250,
+  "ReconnectDelayMs": 5000
+}

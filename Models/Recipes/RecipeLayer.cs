@@ -27,7 +27,7 @@ public sealed partial class RecipeLayer : ObservableObject
     public double PreSputterSeconds { get; init; }
 
     /// <summary>
-    /// 正数表示正转，负数表示反转，0 表示停止。
+    /// 已确认范围0～500 rpm；0表示停止，不接受负值。
     /// </summary>
     public double StageSpeedRpm { get; init; }
 
@@ -56,7 +56,7 @@ public sealed partial class RecipeLayer : ObservableObject
     public double WorkingApcPercent { get; init; }
 
     /// <summary>
-    /// 新建配方层时选择的控压方式。真实 PLC 网关应只操作所选模式对应的两个点位。
+    /// 新建配方层时选择的控压方式。真实PLC网关完整写入18项，未选模式的两个点位写0。
     /// Excel 导入层使用 ImportedValues，继续按 A-S 原始数据完整下发。
     /// </summary>
     public RecipePressureControlMode PressureControlMode { get; init; }

@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Server" Version="1.5.378.156" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
@@ -17,6 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="TestAssets\小方腔工艺配方示例.xls" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\Small square cavity coating machine.csproj" />
+    <None Include="..\App.xaml" Link="TestAssets\App.xaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

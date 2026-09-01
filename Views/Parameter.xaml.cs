@@ -1,26 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
-namespace Small_square_cavity_coating_machine.Views
+using Small_square_cavity_coating_machine.ViewModels.Equipment;
+namespace Small_square_cavity_coating_machine.Views;
+public partial class Parameter : Page
 {
-    /// <summary>
-    /// Parameter.xaml 的交互逻辑
-    /// </summary>
-    public partial class Parameter : Page
-    {
-        public Parameter()
-        {
-            InitializeComponent();
-        }
-    }
+    public Parameter() { InitializeComponent(); }
+    public Parameter(ParameterSettingsViewModel viewModel) : this() { DataContext = viewModel; }
 }

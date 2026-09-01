@@ -6,7 +6,7 @@ using System.Windows;
 
 namespace Small_square_cavity_coating_machine.Services.Recipes;
 
-public sealed class WpfRecipeUserDialogService : IRecipeUserDialogService
+public sealed class WpfRecipeUserDialogService(IReadOnlyList<RecipeDefinition>? definitions = null) : IRecipeUserDialogService
 {
     public string? SelectRecipeFile()
     {
@@ -49,7 +49,7 @@ public sealed class WpfRecipeUserDialogService : IRecipeUserDialogService
 
     public RecipeLayer? ShowNewLayerDialog(int nextSequence)
     {
-        var viewModel = new NewRecipeLayerViewModel(nextSequence);
+        var viewModel = new NewRecipeLayerViewModel(nextSequence, definitions);
         var window = new NewRecipeLayerWindow(viewModel)
         {
             Owner = Application.Current.MainWindow
@@ -88,12 +88,12 @@ public sealed class WpfRecipeUserDialogService : IRecipeUserDialogService
     public void ShowRunFinished(RecipeRunResult result)
     {
         var message = result.IsCompleted
-            ? $"配方镀膜完成，共完成 {result.CompletedLayers} 层。"
-            : $"配方镀膜中止。{Environment.NewLine}原因：{result.FailureReason}";
+            ? $"本次【{result.RecipeName}】镀膜完成，共完成{result.CompletedLayers}层。"
+            : $"停止自动下发，不表示设备已停机。{Environment.NewLine}原因：{result.FailureReason}";
         MessageBox.Show(
             Application.Current.MainWindow,
-            message,
-            result.IsCompleted ? "镀膜完成" : "镀膜中止",
+            message + (result.Notice.Length > 0 ? Environment.NewLine + result.Notice : ""),
+            result.IsCompleted ? "镀膜完成" : "配方下发中断",
             MessageBoxButton.OK,
             result.IsCompleted ? MessageBoxImage.Information : MessageBoxImage.Error);
     }

@@ -1,4 +1,6 @@
 using Small_square_cavity_coating_machine.Models;
+using Small_square_cavity_coating_machine.Models.Alarms;
+using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Recipes;
@@ -7,22 +9,28 @@ using Small_square_cavity_coating_machine.ViewModels;
 using Small_square_cavity_coating_machine.ViewModels.History;
 using Small_square_cavity_coating_machine.ViewModels.Recipes;
 using Small_square_cavity_coating_machine.ViewModels.Security;
+using Small_square_cavity_coating_machine.Models.Equipment;
+using Small_square_cavity_coating_machine.Services.Equipment;
+using Small_square_cavity_coating_machine.ViewModels.Equipment;
 using System.IO;
+using System.ComponentModel;
 using System.Windows.Threading;
 
 namespace Small_square_cavity_coating_machine.Services;
 
 /// <summary>
-/// 应用组合根。后续接入 OPC UA 和 SQLite 时在此替换对应接口实现。
+/// 应用组合根：唯一设备会话，独立只读定义库与运行记录库。
 /// </summary>
 public sealed class ApplicationServices : IDisposable
 {
     private readonly CancellationTokenSource _shutdown = new();
     private readonly ITelemetrySource _telemetrySource;
+    private readonly IUiDispatcher _uiDispatcher;
     private bool _isStarted;
 
     public ApplicationServices(Dispatcher dispatcher)
     {
+        _uiDispatcher = new WpfUiDispatcher(dispatcher);
         var userDataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SmallSquareCavityCoatingMachine");
@@ -33,10 +41,60 @@ public sealed class ApplicationServices : IDisposable
         UserRepository.Initialize();
 
         SessionTrendStore = new SessionTrendStore();
-        OperationLogRepository = new InMemoryOperationLogRepository();
-        AlarmLogRepository = new InMemoryAlarmLogRepository();
+        var simulateAlarms = Environment.GetCommandLineArgs().Contains("--simulate-alarms", StringComparer.OrdinalIgnoreCase);
+        var runtime = new EquipmentRuntimeRepository(Path.Combine(userDataDirectory,
+            simulateAlarms ? "equipment-runtime.simulation.db" : "equipment-runtime.db"));
+        OperationLogRepository = runtime;
         UserSession = new UserSession(UserRepository);
         AuthorizationService = new AuthorizationService(UserSession);
+        AlarmLogRepository = new SqliteAlarmLogRepository(Path.Combine(userDataDirectory,
+            simulateAlarms ? "alarm-history.simulation.db" : "alarm-history.db"));
+        var definitionErrors = new Dictionary<string, string>();
+        string? definitionPath = null;
+        try { definitionPath = SqliteAlarmDefinitionRepository.ExtractEmbeddedDatabase(Path.Combine(userDataDirectory, "Database")); }
+        catch (Exception ex) { foreach (var group in EquipmentGroups.Monitored) definitionErrors[group] = ex.Message; }
+        AlarmDefinitions = LoadDefinitions(EquipmentGroups.Alarm, () => new SqliteAlarmDefinitionRepository(definitionPath!).Load());
+        var ioDefinitions = LoadDefinitions(EquipmentGroups.Io, () => new SqliteEquipmentDefinitionRepository(definitionPath!).LoadIo());
+        var parameterDefinitions = LoadDefinitions(EquipmentGroups.Parameter, () => new SqliteEquipmentDefinitionRepository(definitionPath!).LoadParameters());
+        var controlDefinitions = EquipmentControlDefinitions.Empty;
+        IReadOnlyList<T> LoadDefinitions<T>(string group, Func<IReadOnlyList<T>> load)
+        {
+            if (definitionPath is null) return [];
+            try { return load(); }
+            catch (Exception ex) { definitionErrors[group] = ex.Message; return []; }
+        }
+        var recipeDefinitions = LoadDefinitions(EquipmentGroups.Recipe, () => new SqliteRecipeDefinitionRepository(definitionPath!).Load());
+        var processDefinitions = LoadDefinitions(EquipmentGroups.Process, () => new SqliteProcessDefinitionRepository(definitionPath!).Load());
+        if (definitionPath is not null)
+        {
+            try { controlDefinitions = new SqliteEquipmentDefinitionRepository(definitionPath).LoadControls(); }
+            catch (Exception ex)
+            {
+                foreach (var group in EquipmentGroups.ControlArrays.Concat(EquipmentGroups.SystemControlPoints))
+                    definitionErrors[group] = ex.Message;
+            }
+        }
+        var simulator = simulateAlarms ? new SimulatedEquipmentSessionFactory(parameterDefinitions, processDefinitions) : null;
+        EquipmentClient = new OpcUaEquipmentClient(
+            simulateAlarms ? new SimulationConnectionSettings()
+                : new AlarmConnectionSettingsStore(Path.Combine(userDataDirectory, "alarms.opcua.json")),
+            simulator is not null ? simulator : new OpcUaEquipmentSessionFactory(Path.Combine(userDataDirectory, "pki")),
+            AlarmDefinitions, ioDefinitions, parameterDefinitions, AuthorizationService, runtime, simulateAlarms, definitionErrors,
+            enableRecipes: true, processDefinitions: processDefinitions, controlDefinitions: controlDefinitions);
+        ControlService = new EquipmentControlService(EquipmentClient, controlDefinitions);
+        AlarmSignalSource = new EquipmentAlarmSignalSource(EquipmentClient);
+        IoStatus = new IoStatusViewModel(ioDefinitions, EquipmentClient, _uiDispatcher);
+        ParameterSettings = new ParameterSettingsViewModel(parameterDefinitions, EquipmentClient, runtime, AuthorizationService, _uiDispatcher, ControlService);
+        AlarmNavigation = new AlarmNavigationService();
+        AlarmMonitor = new AlarmMonitorService(AlarmDefinitions, AlarmSignalSource, AlarmLogRepository);
+        AlarmStatus = new AlarmStatusViewModel(AlarmMonitor, AlarmLogRepository, _uiDispatcher, AlarmNavigation);
+        ApplicationStatusViewModel.Instance.AlarmStatus = AlarmStatus;
+        ApplicationStatusViewModel.Instance.PlcConnectionState = PlcConnectionState.Disconnected;
+        ApplicationStatusViewModel.Instance.PlcConnectionText = "PLC未连接";
+        PlcConnection = new PlcConnectionStatusViewModel(EquipmentClient, _uiDispatcher);
+        ApplicationStatusViewModel.Instance.PlcConnection = PlcConnection;
+        PlcConnection.PropertyChanged += PlcConnectionPropertyChanged;
+        SyncPlcConnectionStatus();
         AuthenticationService = new AuthenticationService(
             UserRepository,
             UserSession,
@@ -54,26 +112,30 @@ public sealed class ApplicationServices : IDisposable
             UserSession,
             AuthorizationService,
             AuthenticationService,
-            new WpfUserManagementDialogService());
+            new WpfUserManagementDialogService(), ControlService, _uiDispatcher);
         var trendFileService = new CsvTrendFileService();
         var fileDialogService = new HistoryFileDialogService();
+        ProcessTrendRecorder = new ProcessTrendRecorder(
+            new SqliteProcessTrendRepository(Path.Combine(userDataDirectory,
+                simulateAlarms ? "trend-history.simulation.db" : "trend-history.db")),
+            trendFileService, Path.Combine(userDataDirectory, simulateAlarms ? "ProcessTrends.Simulation" : "ProcessTrends"),
+            processDefinitions, simulateAlarms);
+        ProcessTrendRecorder.Changed += OnTrendRecordingChanged;
 
-        SeedSimulationHistory();
+        if (simulateAlarms) SeedSimulationHistory();
 
         ControlViewModel = new ControlViewModel(
             OperationLogRepository,
-            AuthorizationService);
-#if DEBUG
-        RecipePlcGateway = new SimulatedRecipePlcGateway();
-        ApplicationStatusViewModel.Instance.PlcConnectionState = PlcConnectionState.Connected;
-#else
-        RecipePlcGateway = new UnavailableRecipePlcGateway();
-#endif
-        var recipeImporter = new ExcelRecipeImporter();
-        var recipeDialogService = new WpfRecipeUserDialogService();
+            AuthorizationService,
+            ControlService,
+            _uiDispatcher);
+        RecipePlcGateway = new OpcUaRecipePlcGateway(EquipmentClient, runtime, recipeDefinitions,
+            definitionErrors.GetValueOrDefault(EquipmentGroups.Recipe, ""));
+        var recipeImporter = new ExcelRecipeImporter(recipeDefinitions);
+        var recipeDialogService = new WpfRecipeUserDialogService(recipeDefinitions);
         var recipeDispatchService = new RecipeDispatchService(
             RecipePlcGateway,
-            OperationLogRepository);
+            OperationLogRepository, trendRecorder: ProcessTrendRecorder);
         ProcessViewModel = new ProcessViewModel(
             recipeImporter,
             recipeDispatchService,
@@ -81,32 +143,42 @@ public sealed class ApplicationServices : IDisposable
             recipeDialogService,
             OperationLogRepository,
             ApplicationStatusViewModel.Instance,
-            AuthorizationService);
+            AuthorizationService, _uiDispatcher);
 
         var liveTrend = new LiveTrendViewModel(
             dispatcher,
             SessionTrendStore,
             trendFileService,
-            fileDialogService);
+            fileDialogService, simulateAlarms, ProcessTrendRecorder);
         var processTrend = new ProcessTrendViewModel(
             dispatcher,
             trendFileService,
-            fileDialogService);
-        var operationHistory = new OperationHistoryViewModel(OperationLogRepository);
-        var alarmHistory = new AlarmHistoryViewModel(AlarmLogRepository);
+            fileDialogService, ProcessTrendRecorder);
+        var operationHistory = new OperationHistoryViewModel(OperationLogRepository, _uiDispatcher);
+        var alarmHistory = new AlarmHistoryViewModel(AlarmLogRepository, _uiDispatcher,
+            simulator is not null ? new AlarmSimulationViewModel(simulator, AlarmDefinitions) : null);
         HistoryViewModel = new HistoryViewModel(
             liveTrend,
             processTrend,
             operationHistory,
             alarmHistory);
 
-        _telemetrySource = new MockTelemetrySource(
-            TimeSpan.FromSeconds(1),
-            TimeSpan.FromMinutes(1));
-        _telemetrySource.SampleReceived += (_, sample) => SessionTrendStore.Append(sample);
+        _telemetrySource = new OpcUaTelemetrySource(EquipmentClient, processDefinitions,
+            definitionErrors.GetValueOrDefault(EquipmentGroups.Process, ""));
+        _telemetrySource.SampleReceived += OnTelemetrySample;
     }
 
     public ISessionTrendStore SessionTrendStore { get; }
+    public IProcessTrendRecorder ProcessTrendRecorder { get; }
+
+    private void OnTrendRecordingChanged(object? sender, EventArgs e) => _uiDispatcher.Post(() =>
+    {
+        if (!_shutdown.IsCancellationRequested)
+            ApplicationStatusViewModel.Instance.HistoryRecordingError = ProcessTrendRecorder.RecordingError;
+    });
+
+    private void OnTelemetrySample(object? sender, TelemetrySample sample) =>
+        SessionTrendStore.Append(ProcessTrendRecorder.RecordSample(sample));
 
     public IPasswordHasher PasswordHasher { get; }
 
@@ -126,7 +198,17 @@ public sealed class ApplicationServices : IDisposable
 
     public IOperationLogRepository OperationLogRepository { get; }
 
+    public IOpcUaEquipmentClient EquipmentClient { get; }
+    public IEquipmentControlService ControlService { get; }
+    public IoStatusViewModel IoStatus { get; }
+    public ParameterSettingsViewModel ParameterSettings { get; }
     public IAlarmLogRepository AlarmLogRepository { get; }
+    public IReadOnlyList<AlarmDefinition> AlarmDefinitions { get; }
+    public IAlarmSignalSource AlarmSignalSource { get; }
+    public IAlarmMonitorService AlarmMonitor { get; }
+    public AlarmStatusViewModel AlarmStatus { get; }
+    public AlarmNavigationService AlarmNavigation { get; }
+    public PlcConnectionStatusViewModel PlcConnection { get; }
 
     public ControlViewModel ControlViewModel { get; }
 
@@ -144,14 +226,46 @@ public sealed class ApplicationServices : IDisposable
         }
 
         _isStarted = true;
-        return _telemetrySource.StartAsync(_shutdown.Token);
+        return Task.WhenAll(_telemetrySource.StartAsync(_shutdown.Token),
+            AlarmSignalSource.StartAsync(AlarmDefinitions, _shutdown.Token));
+    }
+
+    private void PlcConnectionPropertyChanged(object? sender, PropertyChangedEventArgs e) => SyncPlcConnectionStatus();
+
+    private void SyncPlcConnectionStatus()
+    {
+        if (_shutdown.IsCancellationRequested) return;
+        ApplicationStatusViewModel.Instance.PlcConnectionState = PlcConnection.ConnectionState;
+        ApplicationStatusViewModel.Instance.PlcConnectionText = PlcConnection.StatusText;
     }
 
     public void Dispose()
     {
         _shutdown.Cancel();
         ProcessViewModel.Dispose();
+        HistoryViewModel.LiveTrend.Dispose();
+        HistoryViewModel.ProcessTrend.Dispose();
         _telemetrySource.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _telemetrySource.SampleReceived -= OnTelemetrySample;
+        AlarmSignalSource.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        EquipmentClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        IoStatus.Dispose();
+        ParameterSettings.Dispose();
+        ControlViewModel.Dispose();
+        UserManagementViewModel.Dispose();
+        ((EquipmentControlService)ControlService).Dispose();
+        HistoryViewModel.OperationHistory.Dispose();
+        PlcConnection.PropertyChanged -= PlcConnectionPropertyChanged;
+        PlcConnection.Dispose();
+        ApplicationStatusViewModel.Instance.PlcConnection = null;
+        AlarmMonitor.Dispose();
+        AlarmStatus.Dispose();
+        HistoryViewModel.AlarmHistory.Dispose();
+        ((SqliteAlarmLogRepository)AlarmLogRepository).DisposeAsync().AsTask().GetAwaiter().GetResult();
+        ApplicationStatusViewModel.Instance.AlarmStatus = null;
+        ProcessTrendRecorder.Changed -= OnTrendRecordingChanged;
+        ProcessTrendRecorder.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        ApplicationStatusViewModel.Instance.HistoryRecordingError = "";
         _shutdown.Dispose();
     }
 
@@ -189,19 +303,5 @@ public sealed class ApplicationServices : IDisposable
             "模拟互锁条件未满足",
             true));
 
-        AlarmLogRepository.Add(new AlarmLogRecord(
-            now.AddHours(-3),
-            "警告",
-            "模拟通信",
-            "[模拟] PLC通信短时中断",
-            now.AddHours(-3).AddMinutes(2),
-            true));
-        AlarmLogRepository.Add(new AlarmLogRecord(
-            now.AddDays(-1),
-            "提示",
-            "模拟真空系统",
-            "[模拟] 真空采样值暂不可用",
-            now.AddDays(-1).AddMinutes(1),
-            true));
     }
 }

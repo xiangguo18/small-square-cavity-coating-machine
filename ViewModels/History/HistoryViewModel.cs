@@ -1,7 +1,10 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Small_square_cavity_coating_machine.ViewModels.History;
 
-public sealed class HistoryViewModel
+public sealed partial class HistoryViewModel : ObservableObject
 {
+    [ObservableProperty] private int selectedTabIndex;
     public HistoryViewModel(
         LiveTrendViewModel liveTrend,
         ProcessTrendViewModel processTrend,

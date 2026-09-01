@@ -52,6 +52,8 @@ public interface IAuthorizationService
 
     string CurrentUserName { get; }
 
+    bool IsBuiltInAdministrator => false;
+
     bool CanOperate(PermissionKey permission);
 
     bool TryAuthorize(PermissionKey permission);

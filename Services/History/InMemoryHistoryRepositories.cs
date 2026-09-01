@@ -39,15 +39,29 @@ public sealed class InMemoryAlarmLogRepository : IAlarmLogRepository
     private readonly List<AlarmLogRecord> _records = [];
 
     public event EventHandler<AlarmLogRecord>? RecordAdded;
+    public event EventHandler<AlarmLogRecord>? RecordChanged;
+    public event EventHandler? StorageStatusChanged { add { } remove { } }
+    public string StorageError => string.Empty;
 
-    public void Add(AlarmLogRecord record)
+    public void Add(AlarmLogRecord record) => Upsert(record);
+
+    public void Upsert(AlarmLogRecord record)
     {
         lock (_gate)
         {
-            _records.Add(record);
+            var index = _records.FindIndex(item => item.OccurrenceId == record.OccurrenceId);
+            if (index >= 0)
+                _records[index] = record;
+            else
+                _records.Add(record);
+            if (index < 0) RecordAdded?.Invoke(this, record);
+            RecordChanged?.Invoke(this, record);
         }
+    }
 
-        RecordAdded?.Invoke(this, record);
+    public IReadOnlyList<AlarmLogRecord> LoadUncleared()
+    {
+        lock (_gate) return _records.Where(record => !record.ClearedAt.HasValue).ToArray();
     }
 
     public IReadOnlyList<AlarmLogRecord> Query(

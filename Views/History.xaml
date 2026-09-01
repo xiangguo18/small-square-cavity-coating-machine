@@ -12,13 +12,13 @@
 
     <controls:HmiPageLayout PageTitle="历史记录">
         <controls:HmiPageLayout.PageContent>
-            <TabControl Style="{StaticResource HistoryTabControlStyle}"
+            <TabControl SelectedIndex="{Binding SelectedTabIndex}" Style="{StaticResource HistoryTabControlStyle}"
                         ItemContainerStyle="{StaticResource HistoryTabItemStyle}">
                 <TabItem Header="数据曲线">
                     <historyViews:TrendChartView DataContext="{Binding LiveTrend}"/>
                 </TabItem>
                 <TabItem Header="工艺记录">
-                    <historyViews:TrendChartView DataContext="{Binding ProcessTrend}"/>
+                    <historyViews:ProcessHistoryView DataContext="{Binding ProcessTrend}"/>
                 </TabItem>
                 <TabItem Header="操作记录">
                     <historyViews:OperationHistoryView DataContext="{Binding OperationHistory}"/>

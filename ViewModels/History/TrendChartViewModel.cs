@@ -70,6 +70,9 @@ public abstract partial class TrendChartViewModel : ObservableObject
     [ObservableProperty]
     private bool isAutoFollow = true;
 
+    [ObservableProperty] private string acquisitionStatus = "";
+    [ObservableProperty] private string recordingError = "";
+
     protected TrendChartViewModel(Dispatcher dispatcher, bool isLive)
     {
         _dispatcher = dispatcher;
@@ -210,10 +213,21 @@ public abstract partial class TrendChartViewModel : ObservableObject
         else
         {
             ResetArchiveAxes();
+            ResetValueAxes();
         }
 
         InvalidatePlots();
     }
+
+    protected void OnUi(Action action)
+    {
+        if (_dispatcher.HasShutdownStarted) return;
+        if (_dispatcher.CheckAccess()) action();
+        else _ = _dispatcher.InvokeAsync(action);
+    }
+
+    protected Task OnUiAsync(Action action) => _dispatcher.HasShutdownStarted
+        ? Task.CompletedTask : _dispatcher.InvokeAsync(action).Task;
 
     protected void AppendSample(TelemetrySample sample)
     {
@@ -413,8 +427,11 @@ public abstract partial class TrendChartViewModel : ObservableObject
                      _temperatureTimeAxis
                  })
         {
-            axis.Minimum = double.NaN;
-            axis.Maximum = double.NaN;
+            // Hidden vacuum series still share the archive's real time range.
+            var hasSamples = _highVacuumSeries.Points.Count > 0;
+            axis.Minimum = hasSamples ? _highVacuumSeries.Points[0].X : double.NaN;
+            axis.Maximum = hasSamples ? Math.Max(_highVacuumSeries.Points[^1].X,
+                axis.Minimum + TimeSpan.FromSeconds(1).TotalDays) : double.NaN;
             axis.Reset();
         }
     }
@@ -483,20 +500,27 @@ public abstract partial class TrendChartViewModel : ObservableObject
     }
 }
 
-public sealed class LiveTrendViewModel : TrendChartViewModel
+public sealed class LiveTrendViewModel : TrendChartViewModel, IDisposable
 {
     private readonly ISessionTrendStore _trendStore;
     private readonly ITrendFileService _fileService;
     private readonly IHistoryFileDialogService _fileDialogService;
 
+    private readonly IProcessTrendRecorder? _recorder;
+    private bool _disposed;
+
     public LiveTrendViewModel(
         Dispatcher dispatcher,
         ISessionTrendStore trendStore,
         ITrendFileService fileService,
-        IHistoryFileDialogService fileDialogService)
+        IHistoryFileDialogService fileDialogService, bool isSimulated = false, IProcessTrendRecorder? recorder = null)
         : base(dispatcher, isLive: true)
     {
         _trendStore = trendStore;
+        IsSimulationMode = isSimulated;
+        _recorder = recorder;
+        AcquisitionStatus = "等待PLC过程数据（每1秒记录）";
+        if (_recorder is not null) _recorder.Changed += OnRecordingChanged;
         _fileService = fileService;
         _fileDialogService = fileDialogService;
         ActionCommand = new AsyncRelayCommand(SaveAsync);
@@ -509,9 +533,28 @@ public sealed class LiveTrendViewModel : TrendChartViewModel
 
     public override IAsyncRelayCommand ActionCommand { get; }
 
-    public override bool IsSimulationMode => true;
+    public override bool IsSimulationMode { get; }
 
-    private void OnSampleAdded(object? sender, TelemetrySample sample) => AppendSample(sample);
+    private void OnSampleAdded(object? sender, TelemetrySample sample) => OnUi(() =>
+    {
+        if (_disposed) return;
+        AcquisitionStatus = sample.DataQuality is "Good" or "Simulation:Good"
+            ? "每1秒记录一组 · " + (IsSimulationMode ? "模拟数据" : "PLC实时数据")
+            : "过程数据缺失：" + sample.DataQuality;
+        AppendSample(sample);
+    });
+
+    private void OnRecordingChanged(object? sender, EventArgs e) => OnUi(() =>
+    {
+        if (!_disposed) RecordingError = _recorder?.RecordingError ?? "";
+    });
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _trendStore.SampleAdded -= OnSampleAdded;
+        if (_recorder is not null) _recorder.Changed -= OnRecordingChanged;
+    }
 
     private async Task SaveAsync()
     {
@@ -541,86 +584,5 @@ public sealed class LiveTrendViewModel : TrendChartViewModel
         {
             StatusMessage = $"保存失败：{exception.Message}";
         }
-    }
-}
-
-public sealed class ProcessTrendViewModel : TrendChartViewModel
-{
-    private readonly ITrendFileService _fileService;
-    private readonly IHistoryFileDialogService _fileDialogService;
-
-    public ProcessTrendViewModel(
-        Dispatcher dispatcher,
-        ITrendFileService fileService,
-        IHistoryFileDialogService fileDialogService)
-        : base(dispatcher, isLive: false)
-    {
-        _fileService = fileService;
-        _fileDialogService = fileDialogService;
-        ActionCommand = new AsyncRelayCommand(QueryAsync);
-        StatusMessage = "请选择一次工艺或手动保存的曲线CSV文件。";
-    }
-
-    public override string ActionText => "查询";
-
-    public override IAsyncRelayCommand ActionCommand { get; }
-
-    public override bool IsSimulationMode => false;
-
-    private async Task QueryAsync()
-    {
-        var path = _fileDialogService.SelectOpenPath();
-        if (path is null)
-        {
-            StatusMessage = "已取消查询。";
-            return;
-        }
-
-        try
-        {
-            StatusMessage = "正在读取曲线数据……";
-            var samples = await _fileService.LoadAsync(path);
-            if (samples.Count == 0)
-            {
-                StatusMessage = "文件格式有效，但没有采样数据。";
-                return;
-            }
-
-            const int maximumDisplayedSamples = 10_000;
-            var displaySamples = Downsample(samples, maximumDisplayedSamples);
-            LoadSamples(displaySamples);
-            CurrentFileName = Path.GetFileName(path);
-            StatusMessage = displaySamples.Count == samples.Count
-                ? $"已载入 {samples.Count:N0} 条采样数据。"
-                : $"已载入 {samples.Count:N0} 条数据，图表抽样显示 {displaySamples.Count:N0} 条。";
-        }
-        catch (Exception exception)
-        {
-            StatusMessage = $"查询失败：{exception.Message}";
-        }
-    }
-
-    private static IReadOnlyList<TelemetrySample> Downsample(
-        IReadOnlyList<TelemetrySample> samples,
-        int maximumCount)
-    {
-        if (samples.Count <= maximumCount)
-        {
-            return samples;
-        }
-
-        var step = (int)Math.Ceiling(samples.Count / (double)maximumCount);
-        var result = new List<TelemetrySample>(maximumCount + 1);
-        for (var index = 0; index < samples.Count; index += step)
-        {
-            result.Add(samples[index]);
-        }
-
-        if (result[^1] != samples[^1])
-        {
-            result.Add(samples[^1]);
-        }
-
-        return result;
     }
 }

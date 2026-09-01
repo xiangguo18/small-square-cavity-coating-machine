@@ -7,5 +7,6 @@ public enum PlcConnectionState
 {
     Disconnected,
     Connected,
-    ConnectionFailed
+    ConnectionFailed,
+    Connecting
 }

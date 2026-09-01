@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Small_square_cavity_coating_machine.Models.History;
+using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.History;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -88,17 +89,27 @@ public abstract partial class HistoryLogViewModelBase : ObservableObject
     }
 }
 
-public sealed partial class OperationHistoryViewModel : HistoryLogViewModelBase
+public sealed partial class OperationHistoryViewModel : HistoryLogViewModelBase, IDisposable
 {
     private readonly IOperationLogRepository _repository;
 
-    public OperationHistoryViewModel(IOperationLogRepository repository)
+    private readonly IUiDispatcher? _dispatcher;
+    private bool _disposed;
+    private int _pending;
+    public OperationHistoryViewModel(IOperationLogRepository repository, IUiDispatcher? dispatcher = null)
     {
-        _repository = repository;
+        _repository = repository; _dispatcher = dispatcher;
         QueryCore();
-        _repository.RecordAdded += (_, _) => QueryCore();
+        _repository.RecordAdded += OnRecordAdded;
     }
 
+    private void OnRecordAdded(object? sender, OperationLogRecord record)
+    {
+        if (Interlocked.Exchange(ref _pending, 1) != 0) return;
+        void Update() { Interlocked.Exchange(ref _pending, 0); if (!_disposed) QueryCore(); }
+        if (_dispatcher is null) Update(); else _dispatcher.Post(Update);
+    }
+    public void Dispose() { _disposed = true; _repository.RecordAdded -= OnRecordAdded; }
     public ObservableCollection<OperationLogRecord> Records { get; } = [];
 
     [RelayCommand]
@@ -118,38 +129,5 @@ public sealed partial class OperationHistoryViewModel : HistoryLogViewModelBase
         StatusMessage = Records.Count == 0
             ? "当前时间范围内没有操作记录。"
             : $"共 {Records.Count:N0} 条操作记录，已按时间倒序排列。";
-    }
-}
-
-public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase
-{
-    private readonly IAlarmLogRepository _repository;
-
-    public AlarmHistoryViewModel(IAlarmLogRepository repository)
-    {
-        _repository = repository;
-        QueryCore();
-        _repository.RecordAdded += (_, _) => QueryCore();
-    }
-
-    public ObservableCollection<AlarmLogRecord> Records { get; } = [];
-
-    [RelayCommand]
-    protected override void QueryCore()
-    {
-        if (!TryBuildRange(out var start, out var end))
-        {
-            return;
-        }
-
-        Records.Clear();
-        foreach (var record in _repository.Query(start, end))
-        {
-            Records.Add(record);
-        }
-
-        StatusMessage = Records.Count == 0
-            ? "当前时间范围内没有报警记录。"
-            : $"共 {Records.Count:N0} 条报警记录，已按时间倒序排列。";
     }
 }

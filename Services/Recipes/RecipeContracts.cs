@@ -14,7 +14,6 @@ public enum RecipeRunState
     Preflight,
     ReadyToSend,
     Sending,
-    AwaitAccepted,
     WaitingLayerComplete,
     Advancing,
     WaitingProcessComplete,
@@ -25,7 +24,11 @@ public enum RecipeRunState
 public sealed record RecipeRunRequest(
     RecipeDispatchMode Mode,
     IReadOnlyList<RecipeLayer> Layers,
-    string SequenceSummary);
+    string SequenceSummary)
+{
+    public string RecipeName { get; init; } = "";
+    public Guid RunId { get; init; } = Guid.NewGuid();
+};
 
 public sealed record RecipeRunProgress(
     RecipeDispatchMode Mode,
@@ -42,6 +45,8 @@ public sealed record RecipeRunResult(
     int CompletedLayers,
     string FailureReason)
 {
+    public string RecipeName { get; init; } = "";
+    public string Notice { get; init; } = "";
     public static RecipeRunResult Completed(int totalLayers)
         => new(true, totalLayers, totalLayers, string.Empty);
 
@@ -58,13 +63,11 @@ public sealed record RecipeGatewayPreflightResult(bool IsReady, string FailureRe
 
 public sealed class RecipeDispatchOptions
 {
-    public TimeSpan PreflightTimeout { get; init; } = TimeSpan.FromSeconds(10);
-
-    public TimeSpan LayerAcceptedTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public TimeSpan PreflightTimeout { get; init; } = TimeSpan.FromSeconds(15);
 
     public TimeSpan LayerCompleteTimeout { get; init; } = TimeSpan.FromHours(24);
 
-    public TimeSpan ProcessCompleteTimeout { get; init; } = TimeSpan.FromMinutes(1);
+    public TimeSpan ProcessCompleteTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
 
 public interface IRecipeExcelImporter
@@ -72,27 +75,19 @@ public interface IRecipeExcelImporter
     RecipeImportResult Import(string filePath);
 }
 
-/// <summary>
-/// 隔离真实 OPC UA 点位和配方调度逻辑。真实实现必须在方法内部完成
-/// 权限/互锁检查、参数块写入、请求脉冲以及反馈边沿去重。
-/// 新建层应按 PressureControlMode 仅写入控压或 APC 定位点位；
-/// Excel 导入层的 ImportedValues 则保持兼容，完整写入 A-S 参数块。
-/// </summary>
+/// <summary>Business protocol: begin, verified layer/reset, wait for completion, commit CoatOK.</summary>
 public interface IRecipePlcGateway
 {
     bool IsAvailable { get; }
-
     bool IsSimulated { get; }
-
+    string Notice => "";
+    event EventHandler? AvailabilityChanged { add { } remove { } }
     Task<RecipeGatewayPreflightResult> PreflightAsync(CancellationToken cancellationToken);
-
+    Task BeginRunAsync(RecipeRunRequest request, CancellationToken cancellationToken);
     Task SendLayerAsync(RecipeLayer layer, CancellationToken cancellationToken);
-
-    Task WaitForLayerAcceptedAsync(CancellationToken cancellationToken);
-
     Task WaitForLayerCompletedAsync(CancellationToken cancellationToken);
-
-    Task WaitForProcessCompletedAsync(CancellationToken cancellationToken);
+    Task CompleteRunAsync(CancellationToken cancellationToken);
+    Task EndRunAsync(RecipeRunResult result) => Task.CompletedTask;
 }
 
 public interface IRecipeDispatchService

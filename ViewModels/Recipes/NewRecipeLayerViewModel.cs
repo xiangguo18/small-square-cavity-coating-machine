@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Small_square_cavity_coating_machine.Models.Recipes;
 using System.Globalization;
+using Small_square_cavity_coating_machine.Services.Recipes;
 
 namespace Small_square_cavity_coating_machine.ViewModels.Recipes;
 
@@ -39,6 +40,7 @@ public sealed partial class RecipeParameterInput : ObservableObject
 public sealed partial class NewRecipeLayerViewModel : ObservableObject
 {
     private readonly RecipeParameterInput[] _commonInputs;
+    private readonly IReadOnlyList<RecipeDefinition> _definitions;
 
     [ObservableProperty]
     private string sequenceText;
@@ -46,8 +48,9 @@ public sealed partial class NewRecipeLayerViewModel : ObservableObject
     [ObservableProperty]
     private RecipePressureControlMode pressureControlMode = RecipePressureControlMode.Pressure;
 
-    public NewRecipeLayerViewModel(int sequence)
+    public NewRecipeLayerViewModel(int sequence, IReadOnlyList<RecipeDefinition>? definitions = null)
     {
+        _definitions = definitions ?? RecipeDefinitions.Default;
         MaximumSequence = sequence;
         SequenceText = sequence.ToString(CultureInfo.InvariantCulture);
 
@@ -61,8 +64,8 @@ public sealed partial class NewRecipeLayerViewModel : ObservableObject
             new(
                 "样品台转速",
                 "rpm",
-                allowsNegative: true,
-                hint: "正数正转，负数反转，0停止"),
+                maximum: 500,
+                hint: "允许0～500 rpm，0停止"),
             new("镀膜时间", "s")
         ];
 
@@ -180,6 +183,8 @@ public sealed partial class NewRecipeLayerViewModel : ObservableObject
             WorkingApcPercent = IsApcMode ? modeValues[1] : 0d,
             PressureControlMode = PressureControlMode
         };
+        try { RecipeDefinitions.ConvertLayer(layer, typeof(double), _definitions); }
+        catch (InvalidOperationException ex) { layer = null; error = ex.Message; return false; }
         return true;
     }
 

@@ -162,6 +162,12 @@
                             <Button Content="删除"
                                     Style="{StaticResource UserActionButtonStyle}"
                                     Command="{Binding DeleteCommand}"/>
+                            <Button Content="{Binding MaintenanceInterlockButtonText}"
+                                    Style="{StaticResource UserActionButtonStyle}"
+                                    Command="{Binding ToggleMaintenanceInterlockCommand}"
+                                    IsEnabled="{Binding CanToggleMaintenanceInterlock}"
+                                    BorderBrush="#FF3B30" BorderThickness="2"
+                                    ToolTip="仅当前登录的内置管理员slkj可解除或恢复PLC互锁"/>
                         </StackPanel>
 
                         <Border Grid.Column="1"

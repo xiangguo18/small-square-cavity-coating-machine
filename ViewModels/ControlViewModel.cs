@@ -43,14 +43,13 @@ public partial class ControlViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(ArgonMixingPipeIsFlowing))]
-    [NotifyPropertyChangedFor(nameof(ArgonValvePairPipeIsFlowing))]
     private bool argonUpperValveIsOpen;
 
     [ObservableProperty]
     private bool argonUpperValveInterlockReleased = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ArgonValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ArgonLowerValveToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(ArgonMfcPipeIsFlowing))]
     private bool argonLowerValveIsOpen;
 
@@ -60,14 +59,13 @@ public partial class ControlViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(NitrogenMixingPipeIsFlowing))]
-    [NotifyPropertyChangedFor(nameof(NitrogenValvePairPipeIsFlowing))]
     private bool nitrogenUpperValveIsOpen;
 
     [ObservableProperty]
     private bool nitrogenUpperValveInterlockReleased = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NitrogenValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(NitrogenLowerValveToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(NitrogenMfcPipeIsFlowing))]
     private bool nitrogenLowerValveIsOpen;
 
@@ -77,14 +75,13 @@ public partial class ControlViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChamberToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(OxygenMixingPipeIsFlowing))]
-    [NotifyPropertyChangedFor(nameof(OxygenValvePairPipeIsFlowing))]
     private bool oxygenUpperValveIsOpen;
 
     [ObservableProperty]
     private bool oxygenUpperValveInterlockReleased = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OxygenValvePairPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(OxygenLowerValveToMixingPipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(OxygenMfcPipeIsFlowing))]
     private bool oxygenLowerValveIsOpen;
 
@@ -100,7 +97,6 @@ public partial class ControlViewModel : ObservableObject
     private bool bypassValveInterlockReleased = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TurboToRightForelinePipeIsFlowing))]
     [NotifyPropertyChangedFor(nameof(RightForelineToDryPumpPipeIsFlowing))]
     private bool rightForelineValveIsOpen;
 
@@ -158,6 +154,15 @@ public partial class ControlViewModel : ObservableObject
     private bool filmGaugeIsReadingEnabled = true;
 
     [ObservableProperty]
+    private bool forelineGaugeIsReadingEnabled = true;
+
+    [ObservableProperty]
+    private bool highVacuumGaugeIsReadingEnabled = true;
+
+    [ObservableProperty]
+    private bool filmGaugeValveIsOpen;
+
+    [ObservableProperty]
     private bool sampleShutterIsOn;
 
     [ObservableProperty]
@@ -188,10 +193,19 @@ public partial class ControlViewModel : ObservableObject
     private bool sampleStageIsReverseRunning;
 
     [ObservableProperty]
+    private bool sampleStageIsRunning;
+
+    [ObservableProperty]
+    private bool sampleStageIsFaulted;
+
+    [ObservableProperty]
     private bool systemIsRunning;
 
     [ObservableProperty]
     private bool systemIsStopped = true;
+
+    [ObservableProperty]
+    private bool systemResetIsActive;
 
     [ObservableProperty]
     private bool automaticModeIsSelected;
@@ -287,8 +301,7 @@ public partial class ControlViewModel : ObservableObject
     public bool ApcToTurboPipeIsFlowing =>
         ChamberToApcPipeIsFlowing && TurboPumpIsRunning;
 
-    public bool TurboToRightForelinePipeIsFlowing =>
-        TurboPumpIsRunning && RightForelineValveIsOpen;
+    public bool TurboToRightForelinePipeIsFlowing => TurboPumpIsRunning;
 
     public bool RightForelineToDryPumpPipeIsFlowing =>
         RightForelineValveIsOpen && DryPumpIsRunning;
@@ -307,24 +320,21 @@ public partial class ControlViewModel : ObservableObject
 
     public bool ArgonMixingPipeIsFlowing => ArgonUpperValveIsOpen;
 
-    public bool ArgonValvePairPipeIsFlowing =>
-        ArgonUpperValveIsOpen && ArgonLowerValveIsOpen;
+    public bool ArgonLowerValveToMixingPipeIsFlowing => ArgonLowerValveIsOpen;
 
     public bool ArgonMfcPipeIsFlowing =>
         ArgonLowerValveIsOpen && IsPositiveFinite(ArgonCurrentFlow);
 
     public bool NitrogenMixingPipeIsFlowing => NitrogenUpperValveIsOpen;
 
-    public bool NitrogenValvePairPipeIsFlowing =>
-        NitrogenUpperValveIsOpen && NitrogenLowerValveIsOpen;
+    public bool NitrogenLowerValveToMixingPipeIsFlowing => NitrogenLowerValveIsOpen;
 
     public bool NitrogenMfcPipeIsFlowing =>
         NitrogenLowerValveIsOpen && IsPositiveFinite(NitrogenCurrentFlow);
 
     public bool OxygenMixingPipeIsFlowing => OxygenUpperValveIsOpen;
 
-    public bool OxygenValvePairPipeIsFlowing =>
-        OxygenUpperValveIsOpen && OxygenLowerValveIsOpen;
+    public bool OxygenLowerValveToMixingPipeIsFlowing => OxygenLowerValveIsOpen;
 
     public bool OxygenMfcPipeIsFlowing =>
         OxygenLowerValveIsOpen && IsPositiveFinite(OxygenCurrentFlow);
@@ -336,6 +346,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleArgonUpperValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Cathode1GasValve", ArgonUpperValveIsOpen, 29, 30, "阴极1气阀")) return;
         ArgonUpperValveIsOpen = !ArgonUpperValveIsOpen;
         LogOperation("Ar前级阀（上）", ArgonUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -344,6 +355,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleArgonLowerValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("ArgonLowerValve", ArgonLowerValveIsOpen, 27, 28, "Ar气阀")) return;
         ArgonLowerValveIsOpen = !ArgonLowerValveIsOpen;
         LogOperation("Ar前级阀（下）", ArgonLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -352,6 +364,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleNitrogenUpperValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Cathode2GasValve", NitrogenUpperValveIsOpen, 33, 34, "阴极2气阀")) return;
         NitrogenUpperValveIsOpen = !NitrogenUpperValveIsOpen;
         LogOperation("N₂前级阀（上）", NitrogenUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -360,6 +373,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleNitrogenLowerValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("NitrogenLowerValve", NitrogenLowerValveIsOpen, 35, 36, "N₂气阀")) return;
         NitrogenLowerValveIsOpen = !NitrogenLowerValveIsOpen;
         LogOperation("N₂前级阀（下）", NitrogenLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -368,6 +382,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleOxygenUpperValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Cathode3GasValve", OxygenUpperValveIsOpen, 37, 38, "阴极3气阀")) return;
         OxygenUpperValveIsOpen = !OxygenUpperValveIsOpen;
         LogOperation("O₂前级阀（上）", OxygenUpperValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -376,6 +391,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleOxygenLowerValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("OxygenLowerValve", OxygenLowerValveIsOpen, 31, 32, "O₂气阀")) return;
         OxygenLowerValveIsOpen = !OxygenLowerValveIsOpen;
         LogOperation("O₂前级阀（下）", OxygenLowerValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -384,6 +400,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleBypassValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("BypassValve", BypassValveIsOpen, 41, 42, "旁抽阀")) return;
         BypassValveIsOpen = !BypassValveIsOpen;
         LogOperation("旁抽阀", BypassValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -392,6 +409,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleRightForelineValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("ForelineValve", RightForelineValveIsOpen, 43, 44, "前级阀")) return;
         RightForelineValveIsOpen = !RightForelineValveIsOpen;
         LogOperation("右侧前级阀", RightForelineValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -400,6 +418,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleLowerForelineValve()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("VentValve", LowerForelineValveIsOpen, 45, 46, "放气阀")) return;
         LowerForelineValveIsOpen = !LowerForelineValveIsOpen;
         LogOperation("下部前级阀", LowerForelineValveIsOpen ? "打开阀门" : "关闭阀门");
     }
@@ -408,6 +427,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleTurboPump()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("TurboPump", TurboPumpIsRunning, 2, 3, "分子泵")) return;
         TurboPumpIsRunning = !TurboPumpIsRunning;
         LogOperation("分子泵", TurboPumpIsRunning ? "启动" : "停止");
     }
@@ -416,6 +436,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleDryPump()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("DryPump", DryPumpIsRunning, 0, 1, "干泵")) return;
         DryPumpIsRunning = !DryPumpIsRunning;
         LogOperation("干泵", DryPumpIsRunning ? "启动" : "停止");
     }
@@ -424,6 +445,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleFilmGauge()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("FilmGaugeValve", FilmGaugeValveIsOpen, 39, 40, "薄膜真空度计阀")) return;
         FilmGaugeIsReadingEnabled = !FilmGaugeIsReadingEnabled;
         LogOperation("薄膜高真空度计", FilmGaugeIsReadingEnabled ? "启用读数" : "停止读数");
     }
@@ -432,6 +454,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetSampleStageSpeed(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(3, value)) return;
         SampleStageSetpointSpeed = value;
         LogOperation("样品台", "设置转速", $"{value:0.###} rpm");
     }
@@ -440,6 +463,7 @@ public partial class ControlViewModel : ObservableObject
     private void StartSampleStageForward()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueStageDirection("Forward", 10)) return;
         SampleStageIsForwardRunning = true;
         SampleStageIsReverseRunning = false;
         LogOperation("样品台", "启动正转", $"{SampleStageSetpointSpeed:0.###} rpm");
@@ -449,6 +473,7 @@ public partial class ControlViewModel : ObservableObject
     private void StartSampleStageReverse()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueStageDirection("Reverse", 11)) return;
         SampleStageIsForwardRunning = false;
         SampleStageIsReverseRunning = true;
         LogOperation("样品台", "启动反转", $"{SampleStageSetpointSpeed:0.###} rpm");
@@ -458,6 +483,7 @@ public partial class ControlViewModel : ObservableObject
     private void StartSystem()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Start")) return;
         SystemIsRunning = true;
         SystemIsStopped = false;
         LogOperation("系统控制", "开启");
@@ -467,6 +493,7 @@ public partial class ControlViewModel : ObservableObject
     private void StopSystem()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Stop")) return;
         SystemIsRunning = false;
         SystemIsStopped = true;
         LogOperation("系统控制", "停止");
@@ -476,6 +503,7 @@ public partial class ControlViewModel : ObservableObject
     private void ResetSystem()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Reset")) return;
         SystemIsRunning = false;
         SystemIsStopped = true;
         AutomaticModeIsSelected = false;
@@ -493,6 +521,7 @@ public partial class ControlViewModel : ObservableObject
     private void SelectAutomaticMode()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Auto")) return;
         AutomaticModeIsSelected = true;
         SemiAutomaticModeIsSelected = false;
         ManualModeIsSelected = false;
@@ -503,6 +532,7 @@ public partial class ControlViewModel : ObservableObject
     private void SelectSemiAutomaticMode()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Semi")) return;
         AutomaticModeIsSelected = false;
         SemiAutomaticModeIsSelected = true;
         ManualModeIsSelected = false;
@@ -513,6 +543,7 @@ public partial class ControlViewModel : ObservableObject
     private void SelectManualMode()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSystemCommand("Manual")) return;
         AutomaticModeIsSelected = false;
         SemiAutomaticModeIsSelected = false;
         ManualModeIsSelected = true;
@@ -523,9 +554,8 @@ public partial class ControlViewModel : ObservableObject
     private void StartVacuum()
     {
         if (!EnsureCanOperate()) return;
-        VacuumingIsSelected = true;
-        VentingIsSelected = false;
-        PressureHoldingIsSelected = false;
+        if (TryQueueWorkflowCommand(980, "抽真空")) return;
+        ToggleWorkflowSelection(980);
         LogOperation("系统控制", "抽真空");
     }
 
@@ -533,9 +563,8 @@ public partial class ControlViewModel : ObservableObject
     private void BreakVacuum()
     {
         if (!EnsureCanOperate()) return;
-        VacuumingIsSelected = false;
-        VentingIsSelected = true;
-        PressureHoldingIsSelected = false;
+        if (TryQueueWorkflowCommand(981, "破真空")) return;
+        ToggleWorkflowSelection(981);
         LogOperation("系统控制", "破真空");
     }
 
@@ -543,9 +572,8 @@ public partial class ControlViewModel : ObservableObject
     private void HoldPressure()
     {
         if (!EnsureCanOperate()) return;
-        VacuumingIsSelected = false;
-        VentingIsSelected = false;
-        PressureHoldingIsSelected = true;
+        if (TryQueueWorkflowCommand(982, "保压")) return;
+        ToggleWorkflowSelection(982);
         LogOperation("系统控制", "保压");
     }
 
@@ -553,6 +581,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleSampleShutter()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("SampleShutter", SampleShutterIsOn, 13, 14, "样品挡板")) return;
         SampleShutterIsOn = !SampleShutterIsOn;
         LogOperation("样品挡板", SampleShutterIsOn ? "打开" : "关闭");
     }
@@ -561,6 +590,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleTarget1Shutter()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Target1Shutter", Target1ShutterIsOn, 15, 16, "靶1挡板")) return;
         Target1ShutterIsOn = !Target1ShutterIsOn;
         LogOperation("靶1挡板", Target1ShutterIsOn ? "打开" : "关闭");
     }
@@ -569,14 +599,43 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleTarget2Shutter()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Target2Shutter", Target2ShutterIsOn, 17, 18, "靶2挡板")) return;
         Target2ShutterIsOn = !Target2ShutterIsOn;
         LogOperation("靶2挡板", Target2ShutterIsOn ? "打开" : "关闭");
+    }
+
+    [RelayCommand]
+    private void SetArgonFlow(double value)
+    {
+        if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(7, value)) return;
+        ArgonSetpointFlow = value;
+        LogOperation("Ar MFC", "设置流量", $"{value:0.###} sccm");
+    }
+
+    [RelayCommand]
+    private void SetNitrogenFlow(double value)
+    {
+        if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(8, value)) return;
+        NitrogenSetpointFlow = value;
+        LogOperation("N₂ MFC", "设置流量", $"{value:0.###} sccm");
+    }
+
+    [RelayCommand]
+    private void SetOxygenFlow(double value)
+    {
+        if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(9, value)) return;
+        OxygenSetpointFlow = value;
+        LogOperation("O₂ MFC", "设置流量", $"{value:0.###} sccm");
     }
 
     [RelayCommand]
     private void ToggleHeater()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Heater", HeaterIsRunning, 8, 9, "加热")) return;
         HeaterIsRunning = !HeaterIsRunning;
         LogOperation("加热", HeaterIsRunning ? "启动" : "停止");
     }
@@ -585,6 +644,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetHeaterTemperature(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(2, value)) return;
         HeaterSetpointTemperature = value;
         LogOperation("加热", "设置目标温度", $"{value:0.###} ℃");
     }
@@ -593,6 +653,7 @@ public partial class ControlViewModel : ObservableObject
     private void TogglePower1()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Power1", Power1IsRunning, 21, 22, "电源1")) return;
         Power1IsRunning = !Power1IsRunning;
         LogOperation("电源1", Power1IsRunning ? "启动" : "停止");
     }
@@ -601,6 +662,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetPower1(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(21, value)) return;
         Power1Setpoint = value;
         LogOperation("电源1", "设置功率", $"{value:0.###} W");
     }
@@ -609,6 +671,7 @@ public partial class ControlViewModel : ObservableObject
     private void TogglePower2()
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueuePartToggle("Power2", Power2IsRunning, 23, 24, "电源2")) return;
         Power2IsRunning = !Power2IsRunning;
         LogOperation("电源2", Power2IsRunning ? "启动" : "停止");
     }
@@ -617,6 +680,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetPower2(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(24, value)) return;
         Power2Setpoint = value;
         LogOperation("电源2", "设置功率", $"{value:0.###} W");
     }
@@ -625,6 +689,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleApcMode()
     {
         if (!EnsureCanOperate()) return;
+        if (_controlService is not null) { ControlStatusText = "第一阶段APC固定为定位模式"; return; }
         ApcIsPositioningMode = !ApcIsPositioningMode;
         LogOperation("APC阀", "切换控制模式", ApcIsPositioningMode ? "定位模式" : "控压模式");
     }
@@ -633,6 +698,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetApcPosition(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (TryQueueSetpoint(1, value)) return;
         ApcPositionSetpoint = value;
         LogOperation("APC阀", "设置位置", $"{value:0.###} %");
     }
@@ -641,6 +707,7 @@ public partial class ControlViewModel : ObservableObject
     private void SetApcPressure(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (_controlService is not null) { ControlStatusText = "APC控压模式地址尚未提供，本次未写入"; return; }
         ApcPressureSetpoint = value;
         LogOperation("APC阀", "设置压力", $"{value:0.###} Pa");
     }

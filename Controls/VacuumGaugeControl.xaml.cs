@@ -77,6 +77,34 @@ public partial class VacuumGaugeControl : UserControl
             typeof(VacuumGaugeControl),
             new FrameworkPropertyMetadata(true));
 
+    public static readonly DependencyProperty IsFaultedProperty =
+        DependencyProperty.Register(
+            nameof(IsFaulted),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty ShowValveStatusProperty =
+        DependencyProperty.Register(
+            nameof(ShowValveStatus),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsValveOpenProperty =
+        DependencyProperty.Register(
+            nameof(IsValveOpen),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsValveFaultedProperty =
+        DependencyProperty.Register(
+            nameof(IsValveFaulted),
+            typeof(bool),
+            typeof(VacuumGaugeControl),
+            new FrameworkPropertyMetadata(false));
+
     public static readonly DependencyProperty CanToggleProperty =
         DependencyProperty.Register(
             nameof(CanToggle),
@@ -158,6 +186,30 @@ public partial class VacuumGaugeControl : UserControl
     {
         get => (bool)GetValue(IsReadingEnabledProperty);
         set => SetValue(IsReadingEnabledProperty, value);
+    }
+
+    public bool IsFaulted
+    {
+        get => (bool)GetValue(IsFaultedProperty);
+        set => SetValue(IsFaultedProperty, value);
+    }
+
+    public bool ShowValveStatus
+    {
+        get => (bool)GetValue(ShowValveStatusProperty);
+        set => SetValue(ShowValveStatusProperty, value);
+    }
+
+    public bool IsValveOpen
+    {
+        get => (bool)GetValue(IsValveOpenProperty);
+        set => SetValue(IsValveOpenProperty, value);
+    }
+
+    public bool IsValveFaulted
+    {
+        get => (bool)GetValue(IsValveFaultedProperty);
+        set => SetValue(IsValveFaultedProperty, value);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Small_square_cavity_coating_machine.Models;
+using Small_square_cavity_coating_machine.ViewModels.History;
 
 namespace Small_square_cavity_coating_machine.ViewModels;
 
@@ -16,6 +17,25 @@ public partial class ApplicationStatusViewModel : ObservableObject
 
     [ObservableProperty]
     private string recipeStatusText = string.Empty;
+
+    [ObservableProperty]
+    private string historyRecordingError = string.Empty;
+
+    [ObservableProperty]
+    private AlarmStatusViewModel? alarmStatus;
+
+    [ObservableProperty]
+    private string plcConnectionText = "PLC未连接";
+
+    [ObservableProperty]
+    private PlcConnectionStatusViewModel? plcConnection;
+
+    [ObservableProperty]
+    private bool maintenanceBypassActive;
+
+    public string MaintenanceWarningText => MaintenanceBypassActive ? "！维修模式，请谨慎控制" : string.Empty;
+
+    partial void OnMaintenanceBypassActiveChanged(bool value) => OnPropertyChanged(nameof(MaintenanceWarningText));
 
     private ApplicationStatusViewModel()
     {

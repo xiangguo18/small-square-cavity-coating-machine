@@ -125,6 +125,20 @@
                                        Foreground="#587181"
                                        FontSize="13"
                                        Text="{Binding Layers.Count, StringFormat=配方层数：{0}}"/>
+                            <Button Content="停止自动下发" Command="{Binding StopAutoDispatchCommand}"
+                                    Margin="0,4,0,0" Padding="8,3" Foreground="#A23A24"
+                                    ToolTip="只停止后续配方下发，不向PLC发送停机命令；设备可能仍在运行">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
                     </Grid>
 

@@ -9,6 +9,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Grid MinHeight="100"
@@ -20,9 +21,24 @@
                        FontWeight="SemiBold"
                        Foreground="#1F2D3D"/>
 
-            <ContentControl Content="{Binding HeaderRightContent, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center"/>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,0,8" HorizontalAlignment="Right"
+                           Text="{Binding MaintenanceWarningText, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
+                           Foreground="#F5A000" FontSize="18" FontWeight="SemiBold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding MaintenanceBypassActive, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ContentControl Content="{Binding HeaderRightContent, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                HorizontalAlignment="Right"/>
+            </StackPanel>
         </Grid>
 
         <ContentControl Grid.Row="1"
@@ -30,7 +46,23 @@
                         VerticalContentAlignment="Stretch"
                         Content="{Binding PageContent, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="2" Background="#FFF0F0" BorderBrush="#C62828" BorderThickness="1"
+                CornerRadius="5" Padding="10,6" Margin="0,8,0,0">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HistoryRecordingError, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Foreground="#C62828" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                       Text="{Binding HistoryRecordingError, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}, StringFormat=工艺曲线记录失败（不影响配方执行）：{0}}"
+                       ToolTip="{Binding HistoryRecordingError, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"/>
+        </Border>
+
+        <Border Grid.Row="3"
                 MinHeight="42"
                 Margin="0,14,0,0"
                 Padding="16,8"
@@ -42,9 +74,13 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MaxWidth="440"/>
                 </Grid.ColumnDefinitions>
 
+                <Grid>
+                <ToggleButton x:Name="PlcSettingsToggle" Background="Transparent" BorderThickness="0" Padding="0"
+                              ToolTip="点击查看/修改PLC连接及各组状态"
+                              Command="{Binding PlcConnection.BeginEditCommand, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Ellipse x:Name="PlcConnectionLight"
@@ -65,33 +101,47 @@
                                                  Value="{x:Static models:PlcConnectionState.ConnectionFailed}">
                                         <Setter Property="Fill" Value="#F44336"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding PlcConnectionState, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
+                                                 Value="{x:Static models:PlcConnectionState.Connecting}">
+                                        <Setter Property="Fill" Value="#FFB300"/>
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Ellipse.Style>
                     </Ellipse>
 
                     <TextBlock VerticalAlignment="Center"
+                               Text="{Binding PlcConnectionText, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
                                FontSize="14"
                                FontWeight="SemiBold"
-                               Foreground="#1F2D3D">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="PLC未连接"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding PlcConnectionState, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
-                                                 Value="{x:Static models:PlcConnectionState.Connected}">
-                                        <Setter Property="Text" Value="PLC已连接"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding PlcConnectionState, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
-                                                 Value="{x:Static models:PlcConnectionState.ConnectionFailed}">
-                                        <Setter Property="Text" Value="PLC连接失败"/>
-                                        <Setter Property="Foreground" Value="#C62828"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                               Foreground="#1F2D3D"/>
                 </StackPanel>
+                </ToggleButton>
+                <Popup x:Name="PlcSettingsPopup" PlacementTarget="{Binding ElementName=PlcSettingsToggle}" Placement="Top"
+                       IsOpen="{Binding IsChecked, ElementName=PlcSettingsToggle, Mode=TwoWay}" StaysOpen="False"
+                       AllowsTransparency="True">
+                    <Border Width="480" Padding="18" Margin="0,0,0,8" Background="White" BorderBrush="#90B9D6"
+                            BorderThickness="1" CornerRadius="8"
+                            DataContext="{Binding PlcConnection, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}">
+                        <StackPanel>
+                            <TextBlock Text="PLC连接设置" FontSize="19" FontWeight="SemiBold" Foreground="#1F2D3D"/>
+                            <TextBlock Text="匿名 · 无加密（仅可信设备网络）&#10;报警/IO/过程曲线只读；参数及配方写入需相应权限" Margin="0,6,0,12"
+                                       Foreground="#9C5700" TextWrapping="Wrap"/>
+                            <TextBlock Text="OPC UA Endpoint" Margin="0,0,0,5"/>
+                            <TextBox x:Name="PlcEndpointEditor" Text="{Binding DraftEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="15" Padding="6" MinWidth="400"/>
+                            <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                            <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" MaxHeight="120" TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding DetailText}" Foreground="#536879"/>
+                            <TextBlock Text="{Binding ValidationError}" TextWrapping="Wrap" Foreground="#C62828" Margin="0,6,0,0"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                                <Button Content="取消" Command="{Binding CancelCommand}" Padding="16,7" Margin="0,0,10,0"/>
+                                <Button Content="保存并连接" Command="{Binding ApplyCommand}" Padding="16,7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+                </Grid>
 
                 <Grid Grid.Column="1"
                       Margin="24,0"
@@ -119,20 +169,50 @@
                     </TextBlock>
                 </Grid>
 
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="&#x26A0;"
-                               Margin="0,0,7,0"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               Foreground="#E67E22"/>
-                    <TextBlock Text="警告提醒！请到历史记录查看"
-                               VerticalAlignment="Center"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="#9A4D00"/>
-                </StackPanel>
+                <Grid Grid.Column="2" DataContext="{Binding AlarmStatus, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}">
+                    <!-- Expansion belongs to this visual instance; alarm data is shared across all pages. -->
+                    <ToggleButton x:Name="AlarmDetailsToggle" HorizontalContentAlignment="Stretch"
+                                  Background="Transparent" BorderThickness="0" Padding="4" ToolTip="{Binding DetailText}">
+                        <TextBlock Text="{Binding SummaryText, FallbackValue=报警状态未确认}"
+                                   Foreground="{Binding IndicatorColor}" TextTrimming="CharacterEllipsis"
+                                   FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </ToggleButton>
+                    <Popup PlacementTarget="{Binding ElementName=AlarmDetailsToggle}" Placement="Top"
+                           IsOpen="{Binding IsChecked, ElementName=AlarmDetailsToggle, Mode=TwoWay}"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border Width="520" MaxHeight="420" Background="White" BorderBrush="#AFC3D2"
+                                BorderThickness="1" CornerRadius="8" Padding="14">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="{Binding SummaryText}" TextWrapping="Wrap" FontSize="16"
+                                           FontWeight="SemiBold" Foreground="{Binding IndicatorColor}"/>
+                                <TextBlock Grid.Row="1" Text="{Binding DetailText}" TextWrapping="Wrap"
+                                           Foreground="#607D8B" Margin="0,8"/>
+                                <ListBox Grid.Row="2" ItemsSource="{Binding ActiveAlarms}" MaxHeight="240"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4">
+                                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                                <TextBlock Foreground="#607D8B">
+                                                    <Run Text="{Binding Severity, Mode=OneWay}"/><Run Text=" · "/>
+                                                    <Run Text="{Binding Address, Mode=OneWay}"/><Run Text=" · "/>
+                                                    <Run Text="{Binding StatusText, Mode=OneWay}"/><Run Text=" · "/>
+                                                    <Run Text="{Binding DataSourceText, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <Button Grid.Row="3" Content="查看报警记录 →" Command="{Binding ShowHistoryCommand}"
+                                        HorizontalAlignment="Right" Padding="14,7" Margin="0,10,0,0"/>
+                            </Grid>
+                        </Border>
+                    </Popup>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

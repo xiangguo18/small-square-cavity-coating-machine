@@ -50,7 +50,17 @@ public interface IAlarmLogRepository
 {
     event EventHandler<AlarmLogRecord>? RecordAdded;
 
+    event EventHandler<AlarmLogRecord>? RecordChanged;
+
+    event EventHandler? StorageStatusChanged;
+
+    string StorageError { get; }
+
     void Add(AlarmLogRecord record);
+
+    void Upsert(AlarmLogRecord record);
+
+    IReadOnlyList<AlarmLogRecord> LoadUncleared();
 
     IReadOnlyList<AlarmLogRecord> Query(DateTimeOffset startInclusive, DateTimeOffset endInclusive);
 }

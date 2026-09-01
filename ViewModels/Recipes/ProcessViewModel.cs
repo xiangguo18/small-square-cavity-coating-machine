@@ -9,6 +9,7 @@ using Small_square_cavity_coating_machine.Services.Security;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
+using Small_square_cavity_coating_machine.Services.Alarms;
 
 namespace Small_square_cavity_coating_machine.ViewModels.Recipes;
 
@@ -24,6 +25,8 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private readonly List<RecipeLayer> _selectedLayers = [];
     private CancellationTokenSource? _activeRunCancellation;
+    private readonly IUiDispatcher? _dispatcher;
+    private bool _disposed;
 
     public ProcessViewModel(
         IRecipeExcelImporter excelImporter,
@@ -32,7 +35,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         IRecipeUserDialogService dialogService,
         IOperationLogRepository operationLogRepository,
         ApplicationStatusViewModel applicationStatus,
-        IAuthorizationService? authorization = null)
+        IAuthorizationService? authorization = null, IUiDispatcher? dispatcher = null)
     {
         _excelImporter = excelImporter;
         _dispatchService = dispatchService;
@@ -41,6 +44,8 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         _operationLogRepository = operationLogRepository;
         _applicationStatus = applicationStatus;
         _authorization = authorization;
+        _dispatcher = dispatcher;
+        _plcGateway.AvailabilityChanged += GatewayAvailabilityChanged;
         if (_authorization is not null)
         {
             _authorization.AccessChanged += Authorization_AccessChanged;
@@ -160,6 +165,9 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         RefreshCommandStates();
     }
 
+    [RelayCommand(CanExecute = nameof(IsRunning))]
+    private void StopAutoDispatch() => _activeRunCancellation?.Cancel();
+
     [RelayCommand(CanExecute = nameof(CanSendAll))]
     private Task SendAllAsync() => EnsureCanOperate()
         ? RunRecipeAsync(RecipeDispatchMode.All, Layers)
@@ -175,10 +183,10 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     private bool CanClearRecipe() => !IsRunning && Layers.Count > 0;
 
     private bool CanSendAll() =>
-        !IsRunning && _plcGateway.IsAvailable && Layers.Count > 0;
+        !IsRunning && CanOperate && _plcGateway.IsAvailable && Layers.Count > 0;
 
     private bool CanSendSelected()
-        => !IsRunning && _plcGateway.IsAvailable && _selectedLayers.Count > 0;
+        => !IsRunning && CanOperate && _plcGateway.IsAvailable && _selectedLayers.Count > 0;
 
     private bool EnsureCanOperate() =>
         _authorization?.TryAuthorize(PermissionKey.ProcessRecipe) ?? true;
@@ -200,7 +208,8 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         RefreshCommandStates();
 
         var sequenceSummary = DescribeSequences(snapshots.Select(layer => layer.Sequence));
-        var request = new RecipeRunRequest(mode, snapshots, sequenceSummary);
+        var request = new RecipeRunRequest(mode, snapshots, sequenceSummary) {
+            RecipeName = string.IsNullOrWhiteSpace(LoadedFileName) ? $"手工配方{DateTime.Now:yyyy-MM-dd HH:mm:ss}" : Path.GetFileNameWithoutExtension(LoadedFileName) };
         var progress = new Progress<RecipeRunProgress>(UpdateRunProgress);
 
         RecipeRunResult result;
@@ -222,12 +231,14 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         }
 
         // 按需求：只有操作员关闭完成/异常弹窗后，底部状态栏才显示终态。
+        if (_disposed) return;
         _dialogService.ShowRunFinished(result);
         _applicationStatus.RecipeStatusText = BuildTerminalStatus(mode, sequenceSummary, result);
     }
 
     private void UpdateRunProgress(RecipeRunProgress progress)
     {
+        if (_disposed || !IsRunning) return;
         foreach (var layer in Layers)
         {
             layer.IsCurrent = progress.State == RecipeRunState.WaitingLayerComplete
@@ -244,14 +255,14 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         if (progress.State == RecipeRunState.WaitingProcessComplete)
         {
             _applicationStatus.RecipeStatusText =
-                $"{modeText}，共{progress.TotalLayers}层，已完成{progress.CompletedLayers}层{selectedText}，等待PLC镀膜完成";
+                $"{modeText}，共{progress.TotalLayers}层，已完成{progress.CompletedLayers}层{selectedText}，正在提交并确认整批完成标志";
             return;
         }
 
         if (progress.CurrentSequence is { } sequence)
         {
             _applicationStatus.RecipeStatusText =
-                $"{modeText}，共{progress.TotalLayers}层，已完成{progress.CompletedLayers}层{selectedText}，正在镀的是第{progress.CurrentPosition}层（序号{sequence}）";
+                $"{modeText}，共{progress.TotalLayers}层，已完成{progress.CompletedLayers}层{selectedText}，{(progress.State == RecipeRunState.WaitingLayerComplete ? "正在镀的是" : "正在校验/下发")}第{progress.CurrentPosition}层（序号{sequence}）";
         }
     }
 
@@ -267,7 +278,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 
         return result.IsCompleted
             ? $"{modeText}，共{result.TotalLayers}层，已完成{result.CompletedLayers}层{selectedText}，镀膜结束"
-            : $"{modeText}，共{result.TotalLayers}层，已完成{result.CompletedLayers}层{selectedText}，因{result.FailureReason}异常，镀膜中止";
+            : $"{modeText}，共{result.TotalLayers}层，已完成{result.CompletedLayers}层{selectedText}，因{result.FailureReason}异常，停止自动下发（不代表设备停机）";
     }
 
     private static string DescribeSequences(IEnumerable<int> sequences)
@@ -293,6 +304,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 
     private void RefreshCommandStates()
     {
+        StopAutoDispatchCommand.NotifyCanExecuteChanged();
         ImportRecipeCommand.NotifyCanExecuteChanged();
         ClearRecipeCommand.NotifyCanExecuteChanged();
         NewRecipeLayerCommand.NotifyCanExecuteChanged();
@@ -354,8 +366,17 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
             _plcGateway.IsSimulated));
     }
 
+    private void GatewayAvailabilityChanged(object? sender, EventArgs e)
+    {
+        if (_disposed) return;
+        if (_dispatcher is not null) _dispatcher.Post(() => { if (!_disposed) RefreshCommandStates(); });
+        else RefreshCommandStates();
+    }
+
     public void Dispose()
     {
+        _disposed = true;
+        _plcGateway.AvailabilityChanged -= GatewayAvailabilityChanged;
         if (_authorization is not null)
         {
             _authorization.AccessChanged -= Authorization_AccessChanged;

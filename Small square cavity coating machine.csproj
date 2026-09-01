@@ -7,6 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <BaseOutputPath>D:\codex\Winforms\Small square cavity coating machine\bin\Debug</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,18 +32,23 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="ExcelDataReader" Version="3.9.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="1.5.378.156" />
     <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Resources\Styles\" />
+    <EmbeddedResource Include="Resources\Database\方腔.db" LogicalName="Equipment.Seed.db" />
+    <None Update="Config\alarms.opcua.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="docs\alarm-integration.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\Fonts\Font Awesome 5 Brands-Regular-400.otf" />
     <Resource Include="Resources\Fonts\Font Awesome 5 Free-Regular-400.otf" />
     <Resource Include="Resources\Fonts\Font Awesome 5 Free-Solid-900.otf" />
+    <Resource Include="Resources\AppIcon.ico" />
     <Resource Include="Resources\logo.png" />
     <Resource Include="Resources\menu.png" />
     <Resource Include="Resources\title.png" />

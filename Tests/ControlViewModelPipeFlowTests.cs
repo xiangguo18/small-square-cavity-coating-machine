@@ -24,7 +24,7 @@ public sealed class ControlViewModelPipeFlowTests
 
         viewModel.TurboPumpIsRunning = true;
         Assert.True(viewModel.ApcToTurboPipeIsFlowing);
-        Assert.False(viewModel.TurboToRightForelinePipeIsFlowing);
+        Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
 
         viewModel.RightForelineValveIsOpen = true;
         Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
@@ -34,7 +34,7 @@ public sealed class ControlViewModelPipeFlowTests
         Assert.True(viewModel.RightForelineToDryPumpPipeIsFlowing);
 
         viewModel.RightForelineValveIsOpen = false;
-        Assert.False(viewModel.TurboToRightForelinePipeIsFlowing);
+        Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
         Assert.False(viewModel.RightForelineToDryPumpPipeIsFlowing);
     }
 
@@ -102,26 +102,64 @@ public sealed class ControlViewModelPipeFlowTests
         Assert.True(viewModel.ArgonMixingPipeIsFlowing);
         Assert.True(viewModel.NitrogenMixingPipeIsFlowing);
         Assert.True(viewModel.OxygenMixingPipeIsFlowing);
-        Assert.False(viewModel.ArgonValvePairPipeIsFlowing);
-        Assert.False(viewModel.NitrogenValvePairPipeIsFlowing);
-        Assert.False(viewModel.OxygenValvePairPipeIsFlowing);
+        Assert.False(viewModel.ArgonLowerValveToMixingPipeIsFlowing);
+        Assert.False(viewModel.NitrogenLowerValveToMixingPipeIsFlowing);
+        Assert.False(viewModel.OxygenLowerValveToMixingPipeIsFlowing);
 
         viewModel.ArgonLowerValveIsOpen = true;
         viewModel.NitrogenLowerValveIsOpen = true;
         viewModel.OxygenLowerValveIsOpen = true;
 
-        Assert.True(viewModel.ArgonValvePairPipeIsFlowing);
-        Assert.True(viewModel.NitrogenValvePairPipeIsFlowing);
-        Assert.True(viewModel.OxygenValvePairPipeIsFlowing);
+        Assert.True(viewModel.ArgonLowerValveToMixingPipeIsFlowing);
+        Assert.True(viewModel.NitrogenLowerValveToMixingPipeIsFlowing);
+        Assert.True(viewModel.OxygenLowerValveToMixingPipeIsFlowing);
         Assert.True(viewModel.ArgonMfcPipeIsFlowing);
         Assert.False(viewModel.NitrogenMfcPipeIsFlowing);
         Assert.True(viewModel.OxygenMfcPipeIsFlowing);
 
         viewModel.ArgonLowerValveIsOpen = false;
-        Assert.False(viewModel.ArgonValvePairPipeIsFlowing);
+        Assert.False(viewModel.ArgonLowerValveToMixingPipeIsFlowing);
         Assert.False(viewModel.ArgonMfcPipeIsFlowing);
         Assert.False(viewModel.NitrogenMfcPipeIsFlowing);
         Assert.True(viewModel.OxygenMfcPipeIsFlowing);
+    }
+
+    [Fact]
+    public void UpperValvePipes_FollowOnlyTheirOwnUpperValve()
+    {
+        var viewModel = new ControlViewModel();
+
+        viewModel.ArgonUpperValveIsOpen = true;
+
+        Assert.True(viewModel.ArgonMixingPipeIsFlowing);
+        Assert.False(viewModel.NitrogenMixingPipeIsFlowing);
+        Assert.False(viewModel.OxygenMixingPipeIsFlowing);
+
+        viewModel.ArgonUpperValveIsOpen = false;
+        viewModel.NitrogenUpperValveIsOpen = true;
+
+        Assert.False(viewModel.ArgonMixingPipeIsFlowing);
+        Assert.True(viewModel.NitrogenMixingPipeIsFlowing);
+        Assert.False(viewModel.OxygenMixingPipeIsFlowing);
+    }
+
+    [Fact]
+    public void LowerValveToMixingPipes_DoNotRequireTheirUpperValve()
+    {
+        var viewModel = new ControlViewModel();
+
+        viewModel.ArgonLowerValveIsOpen = true;
+
+        Assert.True(viewModel.ArgonLowerValveToMixingPipeIsFlowing);
+        Assert.False(viewModel.NitrogenLowerValveToMixingPipeIsFlowing);
+        Assert.False(viewModel.OxygenLowerValveToMixingPipeIsFlowing);
+
+        viewModel.ArgonLowerValveIsOpen = false;
+        viewModel.OxygenLowerValveIsOpen = true;
+
+        Assert.False(viewModel.ArgonLowerValveToMixingPipeIsFlowing);
+        Assert.False(viewModel.NitrogenLowerValveToMixingPipeIsFlowing);
+        Assert.True(viewModel.OxygenLowerValveToMixingPipeIsFlowing);
     }
 
     [Theory]
@@ -157,6 +195,12 @@ public sealed class ControlViewModelPipeFlowTests
 
         Assert.Contains(nameof(ControlViewModel.ChamberToMixingPipeIsFlowing), changedProperties);
         Assert.Contains(nameof(ControlViewModel.ArgonMixingPipeIsFlowing), changedProperties);
+
+        changedProperties.Clear();
+        viewModel.ArgonLowerValveIsOpen = true;
+
+        Assert.Contains(nameof(ControlViewModel.ArgonLowerValveToMixingPipeIsFlowing), changedProperties);
+        Assert.Contains(nameof(ControlViewModel.ArgonMfcPipeIsFlowing), changedProperties);
 
         changedProperties.Clear();
         viewModel.NitrogenCurrentFlow = 0d;

@@ -23,5 +23,10 @@ namespace Small_square_cavity_coating_machine.Views
         {
 
         }
+
+        private void SampleStageSpeedControl_Loaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+
+        }
     }
 }

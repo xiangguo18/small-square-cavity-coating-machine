@@ -9,9 +9,9 @@ namespace Small_square_cavity_coating_machine.Services.Recipes;
 public sealed class ExcelRecipeImporter : IRecipeExcelImporter
 {
     private const int RequiredColumnCount = 19;
-    private const int StageSpeedColumnIndex = 6;
     private const int GasStabilizationColumnIndex = 14;
-    private static readonly HashSet<int> ApcColumnIndexes = [17, 18];
+    private readonly IReadOnlyList<RecipeDefinition> _definitions;
+    public ExcelRecipeImporter(IReadOnlyList<RecipeDefinition>? definitions = null) => _definitions = definitions ?? RecipeDefinitions.Default;
 
     static ExcelRecipeImporter()
     {
@@ -64,7 +64,7 @@ public sealed class ExcelRecipeImporter : IRecipeExcelImporter
         return rows;
     }
 
-    private static RecipeImportResult ParseWorksheet(
+    private RecipeImportResult ParseWorksheet(
         IReadOnlyList<WorksheetRow> rows,
         int worksheetColumnCount)
     {
@@ -125,21 +125,10 @@ public sealed class ExcelRecipeImporter : IRecipeExcelImporter
                     continue;
                 }
 
-                if (columnIndex != StageSpeedColumnIndex && value < 0d)
+                try { RecipeDefinitions.Validate(value, _definitions[columnIndex - 1]); }
+                catch (InvalidOperationException ex)
                 {
-                    errors.Add(new RecipeImportError(
-                        row.RowNumber,
-                        columnIndex + 1,
-                        "除样品台转速外，工艺参数不能为负数。"));
-                    rowHasParameterError = true;
-                }
-
-                if (ApcColumnIndexes.Contains(columnIndex) && value > 100d)
-                {
-                    errors.Add(new RecipeImportError(
-                        row.RowNumber,
-                        columnIndex + 1,
-                        "APC 开度必须在 0-100% 之间。"));
+                    errors.Add(new RecipeImportError(row.RowNumber, columnIndex + 1, ex.Message));
                     rowHasParameterError = true;
                 }
 

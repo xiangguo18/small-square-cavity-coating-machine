@@ -30,6 +30,13 @@ public abstract class DeviceButtonBase : Button
             typeof(DeviceButtonBase),
             new FrameworkPropertyMetadata(false));
 
+    public static readonly DependencyProperty ShowInterlockIndicatorProperty =
+        DependencyProperty.Register(
+            nameof(ShowInterlockIndicator),
+            typeof(bool),
+            typeof(DeviceButtonBase),
+            new FrameworkPropertyMetadata(true));
+
     public string DeviceName
     {
         get => (string)GetValue(DeviceNameProperty);
@@ -46,5 +53,11 @@ public abstract class DeviceButtonBase : Button
     {
         get => (bool)GetValue(IsFaultedProperty);
         set => SetValue(IsFaultedProperty, value);
+    }
+
+    public bool ShowInterlockIndicator
+    {
+        get => (bool)GetValue(ShowInterlockIndicatorProperty);
+        set => SetValue(ShowInterlockIndicatorProperty, value);
     }
 }

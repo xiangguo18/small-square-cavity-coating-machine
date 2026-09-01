@@ -87,6 +87,18 @@
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round"
                                   StrokeLineJoin="Round"/>
+                            <Border x:Name="ValveStatusBadge"
+                                    Width="24" Height="24"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Background="#AEB8BF"
+                                    BorderBrush="#263238"
+                                    BorderThickness="2"
+                                    CornerRadius="12">
+                                <TextBlock Text="阀" FontSize="12" FontWeight="Bold"
+                                           Foreground="White" TextAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
@@ -94,6 +106,18 @@
                                 <Setter TargetName="GaugeBody"
                                         Property="Fill"
                                         Value="#55C878"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ShowValveStatus, ElementName=Root}" Value="False">
+                                <Setter TargetName="ValveStatusBadge" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsValveOpen, ElementName=Root}" Value="True">
+                                <Setter TargetName="ValveStatusBadge" Property="Background" Value="#55C878"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsValveFaulted, ElementName=Root}" Value="True">
+                                <Setter TargetName="ValveStatusBadge" Property="Background" Value="#EF4444"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFaulted, ElementName=Root}" Value="True">
+                                <Setter TargetName="GaugeBody" Property="Fill" Value="#EF4444"/>
                             </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Opacity" Value="0.86"/>

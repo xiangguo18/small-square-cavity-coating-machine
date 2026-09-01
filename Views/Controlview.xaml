@@ -4,6 +4,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
+      xmlns:viewModels="clr-namespace:Small_square_cavity_coating_machine.ViewModels"
       mc:Ignorable="d"
       d:DesignHeight="750"
       d:DesignWidth="1120"
@@ -33,26 +34,85 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- 示意图紧凑样式仅作用于本页，避免改变其他页面的设备控件。 -->
+        <Style x:Key="CompactStraightPipeStyle"
+               TargetType="{x:Type controls:StraightPipeControl}"
+               BasedOn="{StaticResource {x:Type controls:StraightPipeControl}}">
+            <Setter Property="PipeThickness" Value="8"/>
+            <Setter Property="FlowDashLength" Value="6"/>
+            <Setter Property="FlowGapLength" Value="4"/>
+        </Style>
+        <Style x:Key="CompactElbowPipeStyle"
+               TargetType="{x:Type controls:ElbowPipeControl}"
+               BasedOn="{StaticResource {x:Type controls:ElbowPipeControl}}">
+            <Setter Property="PipeThickness" Value="8"/>
+            <Setter Property="FlowDashLength" Value="6"/>
+            <Setter Property="FlowGapLength" Value="4"/>
+        </Style>
+        <Style x:Key="CompactValveStyle"
+               TargetType="{x:Type controls:ValveControl}"
+               BasedOn="{StaticResource {x:Type controls:ValveControl}}">
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="68"/>
+        </Style>
+        <Style x:Key="CompactTurboPumpStyle"
+               TargetType="{x:Type controls:TurbomolecularPumpControl}"
+               BasedOn="{StaticResource {x:Type controls:TurbomolecularPumpControl}}">
+            <Setter Property="Width" Value="76"/>
+            <Setter Property="Height" Value="76"/>
+        </Style>
+        <Style x:Key="CompactDryPumpStyle"
+               TargetType="{x:Type controls:DryPumpControl}"
+               BasedOn="{StaticResource {x:Type controls:DryPumpControl}}">
+            <Setter Property="Width" Value="76"/>
+            <Setter Property="Height" Value="76"/>
+        </Style>
+        <Style x:Key="CompactApcStyle"
+               TargetType="{x:Type controls:ApcValveControl}">
+            <Setter Property="Width" Value="240"/>
+            <Setter Property="Height" Value="150"/>
+            <Setter Property="FontSize" Value="15"/>
+        </Style>
     </Page.Resources>
 
     <controls:HmiPageLayout PageTitle="系统状态">
         <controls:HmiPageLayout.HeaderRightContent>
-            <StackPanel Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <Ellipse Width="13" Height="13"
-                             Fill="#20D34A"
-                             Stroke="#263238"
-                             StrokeThickness="1.5"/>
-                <TextBlock Text="互锁已解除"
-                               Margin="7,0,18,0"
-                               VerticalAlignment="Center"/>
-                <Ellipse Width="13" Height="13"
-                             Fill="White"
-                             Stroke="#263238"
-                             StrokeThickness="1.5"/>
-                <TextBlock Text="互锁未解除"
-                               Margin="7,0,0,0"
-                               VerticalAlignment="Center"/>
+            <StackPanel VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Ellipse Width="13" Height="13" Stroke="#263238" StrokeThickness="1.5">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="White"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding MaintenanceBypassActive, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
+                                                 Value="True">
+                                        <Setter Property="Fill" Value="#20D34A"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Margin="7,0,0,0" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="互锁未解除"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding MaintenanceBypassActive, Source={x:Static viewModels:ApplicationStatusViewModel.Instance}}"
+                                                 Value="True">
+                                        <Setter Property="Text" Value="互锁已解除"/>
+                                        <Setter Property="Foreground" Value="#D97706"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+                <TextBlock Text="{Binding ControlStatusText}"
+                           Margin="0,3,0,0" MaxWidth="360"
+                           HorizontalAlignment="Right" TextAlignment="Right"
+                           FontSize="12" Foreground="#52616D" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </controls:HmiPageLayout.HeaderRightContent>
 
@@ -87,342 +147,309 @@
                                  StretchDirection="Both">
                                 <Canvas Width="826"
                                     Height="658">
-                                    <!-- 腔体与真空度计 -->
-                                    <!-- 腔体与真空度计 -->
-                                    <!-- 腔体与真空度计 -->
-                                    <!-- 腔体与真空度计 -->
-                                    <!-- 腔体与真空度计 -->
-                                    <!-- 腔体与真空度计 -->
+                                    <!-- 管道层：所有管路先绘制，设备图形覆盖连接端，避免遮挡标签。 -->
+                                    <!-- 腔体至混气室的公共汇流管。 -->
 
-                                    <controls:StraightPipeControl
-                        Canvas.Left="553" Canvas.Top="129"
-                        Width="47" Height="24"
-                        IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
-                        FlowAnimationDirection="Forward"
-                        AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <!-- 三条气体支路：Ar、N₂、O₂。 -->
+                                    <controls:StraightPipeControl Canvas.Left="102" Canvas.Top="365"
+                                        Width="16" Height="39" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="232" Canvas.Top="365"
+                                        Width="16" Height="39" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding NitrogenMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="362" Canvas.Top="365"
+                                        Width="16" Height="39" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="102" Canvas.Top="448"
+                                        Width="16" Height="33" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ArgonLowerValveToMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="232" Canvas.Top="448"
+                                        Width="16" Height="33" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding NitrogenLowerValveToMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="362" Canvas.Top="448"
+                                        Width="16" Height="33" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding OxygenLowerValveToMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="102" Canvas.Top="515"
+                                        Width="16" Height="61" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ArgonMfcPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="232" Canvas.Top="515"
+                                        Width="16" Height="61" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding NitrogenMfcPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="362" Canvas.Top="515"
+                                        Width="16" Height="61" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding OxygenMfcPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
-                                    <!-- 腔体与真空度计 -->
+                                    <!-- 右侧真空抽气拓扑保持原有关系，仅压缩尺寸和间距。 -->
+                                    <controls:StraightPipeControl Canvas.Left="429" Canvas.Top="108"
+                                        Width="73" Height="16"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ChamberToApcPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:StraightPipeControl Canvas.Left="536" Canvas.Top="108"
+                                        Width="91" Height="16"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:ElbowPipeControl Canvas.Left="725" Canvas.Top="83"
+                                        Width="66" Height="66" Orientation="BottomLeft"
+                                        Style="{StaticResource CompactElbowPipeStyle}"
+                                        IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="750" Canvas.Top="167"
+                                        Width="16" Height="34" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding RightForelineToDryPumpPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="429" Canvas.Top="210"
+                                        Width="72" Height="16"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ChamberToBypassPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Top" RenderTransformOrigin="0.514,-0.041"/>
+                                    <controls:StraightPipeControl Canvas.Left="534" Canvas.Top="210"
+                                        Width="202" Height="16"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding BypassToDryPumpPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:StraightPipeControl Canvas.Left="455" Canvas.Top="320"
+                                        Width="16" Height="24" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
 
-                                    <controls:ApcValveControl
-                                                          Width="310"
-                                                          Height="192"
-                                                          FontSize="16"
-                                                          DisplayName="APC阀"
-                                                          Orientation="Horizontal"
-                                                          Placement="TopRight"
-                                                          IsPositioningMode="{Binding ApcIsPositioningMode}"
-                                                          CurrentPosition="{Binding ApcCurrentPosition}"
-                                                          PositionSetpoint="{Binding ApcPositionSetpoint}"
-                                                          CurrentPressure="{Binding ApcCurrentPressure}"
-                                                          PressureSetpoint="{Binding ApcPressureSetpoint}"
-                                                          IsOpen="{Binding ApcIsOpen}"
-                                                          IsInterlockReleased="{Binding ApcInterlockReleased}"
-                                                          ToggleModeCommand="{Binding ToggleApcModeCommand}"
-                                                          PositionSetpointCommand="{Binding SetApcPositionCommand}"
-                                                          PressureSetpointCommand="{Binding SetApcPressureCommand}" HorizontalAlignment="Left" Canvas.Left="433" Canvas.Top="20" VerticalAlignment="Top"/>
-                                    <!-- 腔体与真空度计 -->
+                                    <!-- 腔体与混气室。 -->
+                                    <Rectangle Canvas.Left="40" Canvas.Top="86"
+                                        Width="390" Height="194" RadiusX="12" RadiusY="12"
+                                        Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="2"/>
+                                    <TextBlock Canvas.Left="153" Canvas.Top="178"
+                                        Width="164" Text="真空腔体"
+                                        FontSize="24" FontWeight="SemiBold"
+                                        Foreground="#34495E" TextAlignment="Center"/>
+                                    <Rectangle Canvas.Left="58" Canvas.Top="404"
+                                        Width="364" Height="44" RadiusX="6" RadiusY="6"
+                                        Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="2"/>
+                                    <TextBlock Canvas.Left="158" Canvas.Top="412"
+                                        Width="164" Text="混气室"
+                                        FontSize="20" FontWeight="SemiBold"
+                                        Foreground="#34495E" TextAlignment="Center"/>
 
-                                    <controls:StraightPipeControl
-                            Canvas.Left="748" Canvas.Top="214"
-                            Width="24" Height="37"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding RightForelineToDryPumpPipeIsFlowing}"
-                            FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <!-- 腔体与真空度计 -->
+                                    <!-- 真空度计保留在对应设备附近。 -->
+                                    <controls:VacuumGaugeControl Canvas.Left="48" Canvas.Top="-12"
+                                        Width="142" Height="106"
+                                        DisplayName="高真空度计"
+                                        ReadoutWidth="300" ReadoutHeight="100"
+                                        TextPlacement="Top"
+                                        VacuumValue="{Binding HighVacuumValue}"
+                                        IsReadingEnabled="{Binding HighVacuumGaugeIsReadingEnabled}"
+                                        IsFaulted="{Binding HighVacuumGaugeIsFaulted}"
+                                        CanToggle="False"
+                                        Unit="Pa" ValueFormat="0.0"/>
+                                    <controls:VacuumGaugeControl Canvas.Left="268" Canvas.Top="-12"
+                                        Width="142" Height="106"
+                                        DisplayName="薄膜真空度计"
+                                        ReadoutWidth="300" ReadoutHeight="100"
+                                        TextPlacement="Top"
+                                        VacuumValue="{Binding FilmHighVacuumValue}"
+                                        IsReadingEnabled="{Binding FilmGaugeIsReadingEnabled}"
+                                        IsFaulted="{Binding FilmGaugeIsFaulted}"
+                                        ShowValveStatus="True"
+                                        IsValveOpen="{Binding FilmGaugeValveIsOpen}"
+                                        IsValveFaulted="{Binding FilmGaugeValveIsFaulted}"
+                                        CanToggle="True"
+                                        ToggleCommand="{Binding ToggleFilmGaugeCommand}"
+                                        Unit="Pa" ValueFormat="0.0"/>
+                                    <controls:VacuumGaugeControl Canvas.Left="518" Canvas.Top="218"
+                                        Width="138" Height="104"
+                                        DisplayName="前级真空度计"
+                                        SymbolRotation="180"
+                                        ReadoutWidth="300" ReadoutHeight="100"
+                                        TextPlacement="Bottom"
+                                        VacuumValue="{Binding ForelineVacuumValue}"
+                                        IsReadingEnabled="{Binding ForelineGaugeIsReadingEnabled}"
+                                        IsFaulted="{Binding ForelineGaugeIsFaulted}"
+                                        CanToggle="False"
+                                        Unit="Pa" ValueFormat="0.0"/>
 
-                                    <controls:StraightPipeControl
-                            Canvas.Left="68" Canvas.Top="542"
-                            Width="24" Height="38"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding ArgonMfcPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="223" Canvas.Top="542"
-                            Width="24" Height="38"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding NitrogenMfcPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="378" Canvas.Top="542"
-                            Width="24" Height="38"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding OxygenMfcPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="378" Canvas.Top="473"
-                            Width="24" Height="30"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding OxygenValvePairPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="223" Canvas.Top="473"
-                            Width="24" Height="30"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding NitrogenValvePairPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="68" Canvas.Top="473"
-                            Width="24" Height="30"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding ArgonValvePairPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <!-- 腔体与真空度计 -->
-                                    <controls:ElbowPipeControl Canvas.Left="30" Canvas.Top="345"
-                            Width="100" Height="100"
-                            Orientation="BottomRight"
-                            IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:ElbowPipeControl Canvas.Left="340" Canvas.Top="345"
-                            Width="100" Height="100"
-                            Orientation="BottomLeft"
-                            IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Forward" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="222" Canvas.Top="404"
-                            Width="24" Height="30"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding NitrogenMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="222" Canvas.Top="349"
-                            Width="24" Height="30"
-                            Orientation="Vertical"
-                            IsFlowing="{Binding ChamberToMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <!-- 六个气路阀沿三列与 MFC 对齐。 -->
+                                    <controls:ValveControl Canvas.Left="70" Canvas.Top="320"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="上阀1" Orientation="Vertical"
+                                        IsOpen="{Binding ArgonUpperValveIsOpen}"
+                                        IsFaulted="{Binding ArgonUpperValveIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        IsInterlockReleased="{Binding ArgonUpperValveInterlockReleased}"
+                                        Command="{Binding ToggleArgonUpperValveCommand}"
+                                        ToolTip="阴极1气阀状态：Part_State[12]"/>
+                                    <controls:ValveControl Canvas.Left="200" Canvas.Top="320"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="上阀2" Orientation="Vertical"
+                                        IsOpen="{Binding NitrogenUpperValveIsOpen}"
+                                        IsFaulted="{Binding NitrogenUpperValveIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        IsInterlockReleased="{Binding NitrogenUpperValveInterlockReleased}"
+                                        Command="{Binding ToggleNitrogenUpperValveCommand}"
+                                        ToolTip="阴极2气阀状态：Part_State[14]"/>
+                                    <controls:ValveControl Canvas.Left="330" Canvas.Top="320"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="上阀3" Orientation="Vertical"
+                                        IsOpen="{Binding OxygenUpperValveIsOpen}"
+                                        IsFaulted="{Binding OxygenUpperValveIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        IsInterlockReleased="{Binding OxygenUpperValveInterlockReleased}"
+                                        Command="{Binding ToggleOxygenUpperValveCommand}"
+                                        ToolTip="阴极3气阀状态：Part_State[16]"/>
+                                    <controls:ValveControl Canvas.Left="70" Canvas.Top="470"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="下阀1" Orientation="Vertical"
+                                        IsOpen="{Binding ArgonLowerValveIsOpen}"
+                                        IsFaulted="{Binding ArgonLowerValveIsFaulted}"
+                                        IsInterlockReleased="{Binding ArgonLowerValveInterlockReleased}"
+                                        Command="{Binding ToggleArgonLowerValveCommand}"
+                                        ToolTip="Ar气阀状态：Part_State[11]"/>
+                                    <controls:ValveControl Canvas.Left="200" Canvas.Top="470"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="下阀2" Orientation="Vertical"
+                                        IsOpen="{Binding NitrogenLowerValveIsOpen}"
+                                        IsFaulted="{Binding NitrogenLowerValveIsFaulted}"
+                                        IsInterlockReleased="{Binding NitrogenLowerValveInterlockReleased}"
+                                        Command="{Binding ToggleNitrogenLowerValveCommand}"
+                                        ToolTip="N₂气阀状态：Part_State[13]"/>
+                                    <controls:ValveControl Canvas.Left="330" Canvas.Top="470"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="下阀3" Orientation="Vertical"
+                                        IsOpen="{Binding OxygenLowerValveIsOpen}"
+                                        IsFaulted="{Binding OxygenLowerValveIsFaulted}"
+                                        IsInterlockReleased="{Binding OxygenLowerValveInterlockReleased}"
+                                        Command="{Binding ToggleOxygenLowerValveCommand}"
+                                        ToolTip="O₂气阀状态：Part_State[15]"/>
 
-                                    <controls:VacuumGaugeControl
-                            Canvas.Left="46"
-                            Width="160" Height="120"
-                            DisplayName="高真空度计"
-                            ReadoutWidth="300" ReadoutHeight="100"
-                            TextPlacement="Top"
-                            VacuumValue="{Binding HighVacuumValue}"
-                            IsReadingEnabled="True"
-                            CanToggle="False"
-                            Unit="Pa"
-                            ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Top" RenderTransformOrigin="-0.361,0.508"/>
+                                    <controls:MfcFlowMeterControl Canvas.Left="45" Canvas.Top="576"
+                                        Width="130" Height="72"
+                                        DisplayName="MFC · Ar"
+                                        CurrentFlow="{Binding ArgonCurrentFlow}"
+                                        SetpointFlow="{Binding ArgonSetpointFlow}"
+                                        SetpointCommand="{Binding SetArgonFlowCommand}"
+                                        Unit="sccm" ValueFormat="0.0"/>
+                                    <controls:MfcFlowMeterControl Canvas.Left="175" Canvas.Top="576"
+                                        Width="130" Height="72"
+                                        DisplayName="MFC · N₂"
+                                        CurrentFlow="{Binding NitrogenCurrentFlow}"
+                                        SetpointFlow="{Binding NitrogenSetpointFlow}"
+                                        SetpointCommand="{Binding SetNitrogenFlowCommand}"
+                                        Unit="sccm" ValueFormat="0.0"/>
+                                    <controls:MfcFlowMeterControl Canvas.Left="305" Canvas.Top="576"
+                                        Width="130" Height="72"
+                                        DisplayName="MFC · O₂"
+                                        CurrentFlow="{Binding OxygenCurrentFlow}"
+                                        SetpointFlow="{Binding OxygenSetpointFlow}"
+                                        SetpointCommand="{Binding SetOxygenFlowCommand}"
+                                        Unit="sccm" ValueFormat="0.0"/>
 
-                                    <controls:VacuumGaugeControl
-                            Canvas.Left="265"
-                            Width="160" Height="120"
-                            DisplayName="薄膜真空度计"
-                            ReadoutWidth="300" ReadoutHeight="100"
-                            TextPlacement="Top"
-                            VacuumValue="{Binding FilmHighVacuumValue}"
-                            IsReadingEnabled="{Binding FilmGaugeIsReadingEnabled}"
-                            CanToggle="True"
-                            ToggleCommand="{Binding ToggleFilmGaugeCommand}"
-                            Unit="Pa"
-                            ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <!-- 腔体与真空度计 -->
-
-                                    <controls:ElbowPipeControl Canvas.Left="423" Canvas.Top="276"
-                            Width="101" Height="100"
-                            Orientation="BottomLeft"
-                            IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <Rectangle Canvas.Left="46" Canvas.Top="107"
-                               Width="379" Height="247"
-                               RadiusX="12" RadiusY="12"
-                               Fill="#F7F8FA"
-                               Stroke="#34495E"
-                               StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <TextBlock Canvas.Left="150" Canvas.Top="217"
-                               Width="164"
-                               Text="真空腔体"
-                               FontSize="25"
-                               FontWeight="SemiBold"
-                               Foreground="#34495E"
-                               TextAlignment="Center" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <!-- 腔体与真空度计 -->
-                                    <controls:ValveControl
-                            Canvas.Left="25" Canvas.Top="414"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding ArgonUpperValveIsOpen}"
-                            IsInterlockReleased="{Binding ArgonUpperValveInterlockReleased}"
-                            Command="{Binding ToggleArgonUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top" Click="ValveControl_Click"/>
-                                    <controls:ValveControl
-                            Canvas.Left="180" Canvas.Top="414"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding NitrogenUpperValveIsOpen}"
-                            IsInterlockReleased="{Binding NitrogenUpperValveInterlockReleased}"
-                            Command="{Binding ToggleNitrogenUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:ValveControl
-                            Canvas.Left="335" Canvas.Top="414"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding OxygenUpperValveIsOpen}"
-                            IsInterlockReleased="{Binding OxygenUpperValveInterlockReleased}"
-                            Command="{Binding ToggleOxygenUpperValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:ValveControl
-                            Canvas.Left="180" Canvas.Top="484"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding NitrogenLowerValveIsOpen}"
-                            IsInterlockReleased="{Binding NitrogenLowerValveInterlockReleased}"
-                            Command="{Binding ToggleNitrogenLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:ValveControl
-                            Canvas.Left="25" Canvas.Top="484"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding ArgonLowerValveIsOpen}"
-                            IsInterlockReleased="{Binding ArgonLowerValveInterlockReleased}"
-                            Command="{Binding ToggleArgonLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <!-- 腔体右侧：横管、横阀、弯头和干泵 -->
-                                    <controls:ValveControl
-                        Canvas.Left="479" Canvas.Top="222"
-                        Width="111" Height="100"
-                        DeviceName="旁抽阀"
-                        Orientation="Horizontal"
-                        IsOpen="{Binding BypassValveIsOpen}"
-                        IsInterlockReleased="{Binding BypassValveInterlockReleased}"
-                        Command="{Binding ToggleBypassValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-
-                                    <!-- MFC 三行显示 -->
-                                    <controls:MfcFlowMeterControl
-                        Canvas.Left="305" Canvas.Top="577"
-                        Width="170" Height="80"
-                        DisplayName="MFC · O2"
-                        CurrentFlow="{Binding OxygenCurrentFlow}"
-                        SetpointFlow="{Binding ArgonSetpointFlow}"
-                        Unit="sccm"
-                        ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-
-                                    <!-- 直管 + 两个弯头拼成连续的U形管路 -->
-                                    <controls:StraightPipeControl
-                        Canvas.Left="425" Canvas.Top="246"
-                        Width="82" Height="24"
-                        IsFlowing="{Binding ChamberToBypassPipeIsFlowing}"
-                        FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-
-                                    <!-- 四种弯头方向，用于在设计器中复制 -->
-                                    <controls:StraightPipeControl
-                        Canvas.Left="425" Canvas.Top="130"
-                        Width="82" Height="24"
-                        IsFlowing="{Binding ChamberToApcPipeIsFlowing}"
-                        FlowAnimationDirection="Forward"
-                        AnimationDuration="0:0:0.5" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <controls:ElbowPipeControl Canvas.Left="710" Canvas.Top="91"
-                        Width="100" Height="100"
-                        Orientation="BottomLeft"
-                        IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
-                        FlowAnimationDirection="Reverse" RenderTransformOrigin="-5.95,-6.424" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:MfcFlowMeterControl
-                        Canvas.Left="150" Canvas.Top="577"
-                        Width="170" Height="80"
-                        DisplayName="MFC · N2"
-                        CurrentFlow="{Binding NitrogenCurrentFlow}"
-                        SetpointFlow="{Binding ArgonSetpointFlow}"
-                        Unit="sccm"
-                        ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <controls:MfcFlowMeterControl Canvas.Top="577"
-                        Width="170" Height="80"
-                        DisplayName="MFC · Ar"
-                        CurrentFlow="{Binding ArgonCurrentFlow}"
-                        SetpointFlow="{Binding ArgonSetpointFlow}"
-                        Unit="sccm"
-                        ValueFormat="0.0" HorizontalAlignment="Center" VerticalAlignment="Center" Canvas.Left="-5"/>
-                                    <controls:StraightPipeControl
-                        Canvas.Left="461" Canvas.Top="408"
-                        Width="24" Height="37"
-                        Orientation="Vertical"
-                        IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
-                        FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                        Canvas.Left="658" Canvas.Top="129"
-                        Width="52" Height="24"
-                        IsFlowing="{Binding TurboToRightForelinePipeIsFlowing}"
-                        FlowAnimationDirection="Forward" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.653,-3.247"/>
-                                    <controls:TurbomolecularPumpControl
-                        Canvas.Left="578" Canvas.Top="99"
-                        Width="100" Height="100"
-                        DeviceName="分子泵"
-                        LabelPlacement="Bottom"
-                        IsRunning="{Binding TurboPumpIsRunning}"
-                        IsInterlockReleased="{Binding TurboPumpInterlockReleased}"
-                        Command="{Binding ToggleTurboPumpCommand}" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="2.055,0.6"/>
-                                    <controls:VacuumGaugeControl
-                            Canvas.Left="535" Canvas.Top="259"
-                            Width="160" Height="120"
-                            DisplayName="前级真空度计"
-                            SymbolRotation="180"
-                            ReadoutWidth="300" ReadoutHeight="100"
-                            TextPlacement="Bottom"
-                            VacuumValue="{Binding ForelineVacuumValue}"
-                            IsReadingEnabled="True"
-                            CanToggle="False"
-                            Unit="Pa"
-                            ValueFormat="0.0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="130" Canvas.Top="383"
-                            Width="55" Height="24"
-                            IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="283" Canvas.Top="383"
-                            Width="57" Height="24"
-                            IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
-                            FlowAnimationDirection="Reverse" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <controls:StraightPipeControl
-                            Canvas.Left="557" Canvas.Top="246"
-                            Width="196" Height="24"
-                            IsFlowing="{Binding BypassToDryPumpPipeIsFlowing}"
-                            FlowAnimationDirection="Forward" RenderTransformOrigin="0.653,-3.247" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <Rectangle Canvas.Left="185" Canvas.Top="372" Width="99" Height="46" RadiusX="12" RadiusY="12"
-                               Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="3" HorizontalAlignment="Center" VerticalAlignment="Top" RenderTransformOrigin="0.484,0.322" />
-                                    <TextBlock Canvas.Left="152" Canvas.Top="378"
-                            Width="164"
-                            Text="混气室"
-                            FontSize="25"
-                            FontWeight="SemiBold"
-                            Foreground="#34495E"
-                            TextAlignment="Center" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <controls:ValveControl
-                            Canvas.Left="335" Canvas.Top="484"
-                            Width="110" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding OxygenLowerValveIsOpen}"
-                            IsInterlockReleased="{Binding OxygenLowerValveInterlockReleased}"
-                            Command="{Binding ToggleOxygenLowerValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <controls:ValveControl
-                        Canvas.Left="705" Canvas.Top="158"
-                        Width="110" Height="100"
-                        DeviceName="前级阀"
-                        Orientation="Vertical"
-                        IsOpen="{Binding RightForelineValveIsOpen}"
-                        IsInterlockReleased="{Binding RightForelineValveInterlockReleased}"
-                        Command="{Binding ToggleRightForelineValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                                    <Rectangle Canvas.Left="747" Canvas.Top="246" Width="25" Height="44" RadiusX="5" RadiusY="5"
-                            Fill="#F7F8FA" Stroke="#34495E" StrokeThickness="3" RenderTransformOrigin="0.484,0.322" HorizontalAlignment="Center" VerticalAlignment="Top" />
-                                    <controls:DryPumpControl
-                        Canvas.Left="710" Canvas.Top="268"
-                        Width="100" Height="100"
-                        DeviceName="干泵"
-                        LabelPlacement="Bottom"
-                        IsRunning="{Binding DryPumpIsRunning}"
-                        IsInterlockReleased="{Binding DryPumpInterlockReleased}"
-                        Command="{Binding ToggleDryPumpCommand}" RenderTransformOrigin="-2.276,0.82" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <controls:ValveControl
-                            Canvas.Left="423" Canvas.Top="349"
-                            Width="101" Height="100"
-                            DeviceName="前级阀"
-                            Orientation="Vertical"
-                            IsOpen="{Binding LowerForelineValveIsOpen}"
-                            IsInterlockReleased="{Binding LowerForelineValveInterlockReleased}"
-                            Command="{Binding ToggleLowerForelineValveCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                    <!-- 右侧 APC、阀门和泵使用紧凑尺寸。 -->
+                                    <controls:ApcValveControl Canvas.Left="443" Canvas.Top="19"
+                                        Style="{StaticResource CompactApcStyle}"
+                                        DisplayName="APC阀" Orientation="Horizontal" Placement="TopRight"
+                                        IsPositioningMode="{Binding ApcIsPositioningMode}"
+                                        CurrentPosition="{Binding ApcCurrentPosition}"
+                                        PositionSetpoint="{Binding ApcPositionSetpoint}"
+                                        CurrentPressure="{Binding ApcCurrentPressure}"
+                                        PressureSetpoint="{Binding ApcPressureSetpoint}"
+                                        IsOpen="{Binding ApcIsOpen}"
+                                        IsFaulted="{Binding ApcIsFaulted}"
+                                        IsInterlockReleased="{Binding ApcInterlockReleased}"
+                                        ToggleModeCommand="{Binding ToggleApcModeCommand}"
+                                        PositionSetpointCommand="{Binding SetApcPositionCommand}"
+                                        PressureSetpointCommand="{Binding SetApcPressureCommand}" RenderTransformOrigin="0.459,0.686" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                    <controls:ValveControl Canvas.Left="718" Canvas.Top="129"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="前级阀" Orientation="Vertical"
+                                        IsOpen="{Binding RightForelineValveIsOpen}"
+                                        IsFaulted="{Binding RightForelineValveIsFaulted}"
+                                        IsInterlockReleased="{Binding RightForelineValveInterlockReleased}"
+                                        Command="{Binding ToggleRightForelineValveCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:ValveControl Canvas.Left="478" Canvas.Top="192"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="旁抽阀" Orientation="Horizontal"
+                                        IsOpen="{Binding BypassValveIsOpen}"
+                                        IsFaulted="{Binding BypassValveIsFaulted}"
+                                        IsInterlockReleased="{Binding BypassValveInterlockReleased}"
+                                        Command="{Binding ToggleBypassValveCommand}"/>
+                                    <controls:DryPumpControl Canvas.Left="720" Canvas.Top="184"
+                                        Style="{StaticResource CompactDryPumpStyle}"
+                                        DeviceName="干泵" LabelPlacement="Bottom"
+                                        IsRunning="{Binding DryPumpIsRunning}"
+                                        IsFaulted="{Binding DryPumpIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        IsInterlockReleased="{Binding DryPumpInterlockReleased}"
+                                        Command="{Binding ToggleDryPumpCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="102" Canvas.Top="280"
+                                        Width="16" Height="51" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ArgonMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:StraightPipeControl Canvas.Left="232" Canvas.Top="280"
+                                        Width="16" Height="51" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding NitrogenMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:StraightPipeControl Canvas.Left="362" Canvas.Top="280"
+                                        Width="16" Height="51" Orientation="Vertical"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding OxygenMixingPipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:ElbowPipeControl Canvas.Left="430" Canvas.Top="226"
+                                        Width="66" Height="66" Orientation="BottomLeft"
+                                        Style="{StaticResource CompactElbowPipeStyle}"
+                                        IsFlowing="{Binding ChamberToLowerForelinePipeIsFlowing}"
+                                        FlowAnimationDirection="Reverse" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <controls:ValveControl Canvas.Left="423" Canvas.Top="280"
+                                        Style="{StaticResource CompactValveStyle}"
+                                        DeviceName="放气阀" Orientation="Vertical"
+                                        IsOpen="{Binding LowerForelineValveIsOpen}"
+                                        IsFaulted="{Binding LowerForelineValveIsFaulted}"
+                                        IsInterlockReleased="{Binding LowerForelineValveInterlockReleased}"
+                                        Command="{Binding ToggleLowerForelineValveCommand}"/>
+                                    <controls:StraightPipeControl Canvas.Left="669" Canvas.Top="108"
+                                        Width="56" Height="16"
+                                        Style="{StaticResource CompactStraightPipeStyle}"
+                                        IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
+                                        FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <controls:TurbomolecularPumpControl Canvas.Left="609" Canvas.Top="83"
+                                        Style="{StaticResource CompactTurboPumpStyle}"
+                                        DeviceName="分子泵" LabelPlacement="Bottom"
+                                        IsRunning="{Binding TurboPumpIsRunning}"
+                                        IsFaulted="{Binding TurboPumpIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        IsInterlockReleased="{Binding TurboPumpInterlockReleased}"
+                                        Command="{Binding ToggleTurboPumpCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                    <controls:SampleStageSpeedControl Canvas.Left="503" Canvas.Top="517"
+                                        Width="295" Height="98" DisplayName="分子泵转速"
+                                        CurrentSpeed="{Binding TurboPumpCurrentSpeed}"
+                                        SetpointSpeed="{Binding TurboPumpSetpointSpeed}"
+                                        Unit="%" ShowDirectionControls="False"
+                                        SetpointCommand="{Binding SetTurboPumpSpeedCommand}" Loaded="SampleStageSpeedControl_Loaded" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                                 </Canvas>
                             </Viewbox>
                         </Border>
 
-                        <!-- 系统级离线演示命令；后续由 OPC UA 命令确认流程替换。 -->
+                        <!-- 系统命令、使能和反馈均由数据库定义并通过共享 OPC UA 会话绑定。 -->
                         <Border Grid.Column="0"
                             Margin="0,10,0,10"
                             Padding="10"
@@ -464,6 +491,7 @@
                                                 Command="{Binding StopSystemCommand}"/>
                                             <Button Content="复位"
                                                 Style="{StaticResource SystemControlButtonStyle}"
+                                                Tag="{Binding SystemResetIsActive}"
                                                 Command="{Binding ResetSystemCommand}"/>
                                         </UniformGrid>
                                     </Grid>
@@ -567,6 +595,7 @@
                                                     CurrentTemperature="{Binding HeaterCurrentTemperature}"
                                                     SetpointTemperature="{Binding HeaterSetpointTemperature}"
                                                     IsRunning="{Binding HeaterIsRunning}"
+                                                    IsFaulted="{Binding HeaterIsFaulted}"
                                                     IsInterlockReleased="{Binding HeaterInterlockReleased}"
                                                     ToggleCommand="{Binding ToggleHeaterCommand}"
                                                     SetpointCommand="{Binding SetHeaterTemperatureCommand}"/>
@@ -579,9 +608,11 @@
                                                        MeasuredVoltage="{Binding Power1MeasuredVoltage}"
                                                        MeasuredCurrent="{Binding Power1MeasuredCurrent}"
                                                        IsRunning="{Binding Power1IsRunning}"
+                                                       IsFaulted="{Binding Power1IsFaulted}"
                                                        IsInterlockReleased="{Binding Power1InterlockReleased}"
                                                        ToggleCommand="{Binding TogglePower1Command}"
-                                                       SetpointCommand="{Binding SetPower1Command}" Grid.RowSpan="2"/>
+                                                       SetpointCommand="{Binding SetPower1Command}" Grid.RowSpan="2"
+                                                       ToolTip="直流电源状态：Part_State[6]"/>
 
                                     <controls:PowerSupplyControl Grid.Row="1"
                                 Margin="0,128,0,5"
@@ -591,9 +622,11 @@
                                 MeasuredVoltage="{Binding Power2MeasuredVoltage}"
                                 MeasuredCurrent="{Binding Power2MeasuredCurrent}"
                                 IsRunning="{Binding Power2IsRunning}"
+                                IsFaulted="{Binding Power2IsFaulted}"
                                 IsInterlockReleased="{Binding Power2InterlockReleased}"
                                 ToggleCommand="{Binding TogglePower2Command}"
-                                SetpointCommand="{Binding SetPower2Command}" Grid.RowSpan="2"/>
+                                SetpointCommand="{Binding SetPower2Command}" Grid.RowSpan="2"
+                                ToolTip="中频电源状态：Part_State[7]"/>
 
                                     <Grid Grid.Row="3" Margin="0,0,0,21">
                                         <Grid.ColumnDefinitions>
@@ -621,9 +654,11 @@
                                                                       Height="45"
                                                                       HorizontalAlignment="Center"
                                                                       DeviceName="挡板"
-                                                                      IsOn="{Binding SampleShutterIsOn}"
+                                                                       IsOn="{Binding SampleShutterIsOn}"
+                                                                       IsFaulted="{Binding SampleShutterIsFaulted}"
                                                                       IsInterlockReleased="{Binding SampleShutterInterlockReleased}"
-                                                                      Command="{Binding ToggleSampleShutterCommand}"/>
+                                                                      Command="{Binding ToggleSampleShutterCommand}"
+                                                                      ToolTip="样品挡板状态：Part_State[5]"/>
                                             </StackPanel>
                                         </Border>
 
@@ -644,9 +679,11 @@
                                                                       Height="45"
                                                                       HorizontalAlignment="Center"
                                                                       DeviceName="挡板"
-                                                                      IsOn="{Binding Target1ShutterIsOn}"
+                                                                       IsOn="{Binding Target1ShutterIsOn}"
+                                                                       IsFaulted="{Binding Target1ShutterIsFaulted}"
                                                                       IsInterlockReleased="{Binding Target1ShutterInterlockReleased}"
-                                                                      Command="{Binding ToggleTarget1ShutterCommand}"/>
+                                                                      Command="{Binding ToggleTarget1ShutterCommand}"
+                                                                      ToolTip="靶1挡板状态：Part_State[24]"/>
                                             </StackPanel>
                                         </Border>
 
@@ -667,9 +704,11 @@
                                                                       Height="45"
                                                                       HorizontalAlignment="Center"
                                                                       DeviceName="挡板"
-                                                                      IsOn="{Binding Target2ShutterIsOn}"
+                                                                       IsOn="{Binding Target2ShutterIsOn}"
+                                                                       IsFaulted="{Binding Target2ShutterIsFaulted}"
                                                                       IsInterlockReleased="{Binding Target2ShutterInterlockReleased}"
-                                                                      Command="{Binding ToggleTarget2ShutterCommand}"/>
+                                                                      Command="{Binding ToggleTarget2ShutterCommand}"
+                                                                      ToolTip="靶2挡板状态：Part_State[25]"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
@@ -681,10 +720,14 @@
                                     SetpointSpeed="{Binding SampleStageSetpointSpeed}"
                                     IsForwardRunning="{Binding SampleStageIsForwardRunning}"
                                     IsReverseRunning="{Binding SampleStageIsReverseRunning}"
+                                    ShowStatusIndicator="True"
+                                    IsRunning="{Binding SampleStageIsRunning}"
+                                    IsFaulted="{Binding SampleStageIsFaulted}"
                                     Unit="rpm"
                                     SetpointCommand="{Binding SetSampleStageSpeedCommand}"
                                     ForwardCommand="{Binding StartSampleStageForwardCommand}"
-                                    ReverseCommand="{Binding StartSampleStageReverseCommand}" Margin="0,-19,0,-9"/>
+                                    ReverseCommand="{Binding StartSampleStageReverseCommand}" Margin="0,-19,0,-9"
+                                    ToolTip="样品台电机状态：Part_State[4]；正反方向无独立反馈"/>
                                     </Grid>
                                 </Grid>
                             </Viewbox>

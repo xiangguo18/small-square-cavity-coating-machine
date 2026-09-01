@@ -15,7 +15,7 @@ public sealed class RecipeFeatureTests
     public void ImportProvidedXls_MapsNineteenColumnsAndIgnoresTemplateTail()
     {
         var path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            AppContext.BaseDirectory, "TestAssets",
             "小方腔工艺配方示例.xls");
         Assert.True(File.Exists(path), $"测试文件不存在：{path}");
 
@@ -32,7 +32,7 @@ public sealed class RecipeFeatureTests
     }
 
     [Fact]
-    public void ImportXlsx_UsesColumnPositionAndPreservesNegativeStageSpeed()
+    public void ImportXlsx_UsesColumnPositionAndBlankDefaults()
     {
         var path = CreatePositionMappedWorkbook();
         try
@@ -43,7 +43,7 @@ public sealed class RecipeFeatureTests
             var layer = Assert.Single(result.Layers);
             Assert.Equal(1, layer.Sequence);
             Assert.Equal(230d, layer.CathodeAPower);
-            Assert.Equal(-15d, layer.StageSpeedRpm);
+            Assert.Equal(15d, layer.StageSpeedRpm);
             Assert.Equal(2d, layer.GasStabilizationSeconds);
             Assert.Equal(30d, layer.IgnitionApcPercent);
             Assert.Equal(40d, layer.WorkingApcPercent);
@@ -56,9 +56,9 @@ public sealed class RecipeFeatureTests
 
     [Theory]
     [InlineData("15", 15d)]
-    [InlineData("-15", -15d)]
+    [InlineData("500", 500d)]
     [InlineData("0", 0d)]
-    public void NewLayerDialogModel_AcceptsSignedStageSpeed(string input, double expected)
+    public void NewLayerDialogModel_AcceptsAllowedStageSpeed(string input, double expected)
     {
         var viewModel = new NewRecipeLayerViewModel(1);
         var stageSpeed = viewModel.PowerAndTimeInputs.Single(item => item.Label == "样品台转速");
@@ -72,6 +72,8 @@ public sealed class RecipeFeatureTests
     }
 
     [Theory]
+    [InlineData("-15")]
+    [InlineData("501")]
     [InlineData("NaN")]
     [InlineData("Infinity")]
     [InlineData("不是数字")]
@@ -201,14 +203,14 @@ public sealed class RecipeFeatureTests
     }
 
     [Fact]
-    public async Task Dispatch_SendsSignedSpeedUnchangedAndWaitsForProcessComplete()
+    public async Task Dispatch_SendsSpeedUnchangedAndCommitsProcessComplete()
     {
         var gateway = new RecordingRecipeGateway();
         var service = new RecipeDispatchService(
             gateway,
             new InMemoryOperationLogRepository(),
             FastOptions);
-        var layer = new RecipeLayer { Sequence = 1, StageSpeedRpm = -18d };
+        var layer = new RecipeLayer { Sequence = 1, StageSpeedRpm = 18d };
         var request = new RecipeRunRequest(RecipeDispatchMode.All, [layer], "序号1");
 
         var result = await service.RunAsync(
@@ -217,7 +219,7 @@ public sealed class RecipeFeatureTests
             CancellationToken.None);
 
         Assert.True(result.IsCompleted);
-        Assert.Equal(-18d, Assert.Single(gateway.SentLayers).StageSpeedRpm);
+        Assert.Equal(18d, Assert.Single(gateway.SentLayers).StageSpeedRpm);
         Assert.True(gateway.ProcessCompletionWasObserved);
     }
 
@@ -250,7 +252,6 @@ public sealed class RecipeFeatureTests
     private static RecipeDispatchOptions FastOptions { get; } = new()
     {
         PreflightTimeout = TimeSpan.FromSeconds(1),
-        LayerAcceptedTimeout = TimeSpan.FromSeconds(1),
         LayerCompleteTimeout = TimeSpan.FromSeconds(1),
         ProcessCompleteTimeout = TimeSpan.FromSeconds(1)
     };
@@ -330,7 +331,7 @@ public sealed class RecipeFeatureTests
                 <row r="2">
                   <c r="A2"><v>1</v></c>
                   <c r="B2"><v>230</v></c>
-                  <c r="G2"><v>-15</v></c>
+                  <c r="G2"><v>15</v></c>
                   <c r="R2"><v>30</v></c>
                   <c r="S2"><v>40</v></c>
                   <c r="T2" t="inlineStr"><is><t>此列忽略</t></is></c>
@@ -378,7 +379,7 @@ public sealed class RecipeFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task WaitForLayerAcceptedAsync(CancellationToken cancellationToken)
+        public Task BeginRunAsync(RecipeRunRequest request, CancellationToken cancellationToken)
             => Task.CompletedTask;
 
         public Task WaitForLayerCompletedAsync(CancellationToken cancellationToken)
@@ -386,7 +387,7 @@ public sealed class RecipeFeatureTests
                 ? Task.FromException(new InvalidOperationException("模拟PLC异常"))
                 : Task.CompletedTask;
 
-        public Task WaitForProcessCompletedAsync(CancellationToken cancellationToken)
+        public Task CompleteRunAsync(CancellationToken cancellationToken)
         {
             ProcessCompletionWasObserved = true;
             return Task.CompletedTask;

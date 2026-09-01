@@ -534,13 +534,13 @@ public sealed class PermissionFeatureTests : IDisposable
         public Task SendLayerAsync(RecipeLayer layer, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task WaitForLayerAcceptedAsync(CancellationToken cancellationToken) =>
+        public Task BeginRunAsync(RecipeRunRequest request, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
         public Task WaitForLayerCompletedAsync(CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task WaitForProcessCompletedAsync(CancellationToken cancellationToken) =>
+        public Task CompleteRunAsync(CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 

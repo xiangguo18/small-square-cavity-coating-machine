@@ -37,13 +37,17 @@ namespace Small_square_cavity_coating_machine.Views
         private readonly ViewModels.Security.AccountShellViewModel _accountShellViewModel;
         private RadioButton? _selectedMenuButton;
         private long _menuAnimationVersion;
+        private readonly Services.Alarms.AlarmNavigationService _alarmNavigation;
+        private readonly ViewModels.History.HistoryViewModel _historyViewModel;
 
         public MainView(ApplicationServices services)
         {
+            _alarmNavigation = services.AlarmNavigation;
+            _historyViewModel = services.HistoryViewModel;
             _userManagementViewModel = services.UserManagementViewModel;
             _accountShellViewModel = services.AccountShellViewModel;
-            _ioPage = new IO();
-            _parameterPage = new Parameter();
+            _ioPage = new IO(services.IoStatus);
+            _parameterPage = new Parameter(services.ParameterSettings);
             _controlmPage = new Controlview(services.ControlViewModel);
             _processPage = new Process(services.ProcessViewModel);
             _historyPage = new History(services.HistoryViewModel);
@@ -55,6 +59,18 @@ namespace Small_square_cavity_coating_machine.Views
 
             // 未登录用户也可以查看实时状态；所有写命令仍由权限服务拦截。
             PageNavigation.Navigate(_controlmPage);
+            _alarmNavigation.HistoryRequested += ShowAlarmHistory;
+            Closed += (_, _) => _alarmNavigation.HistoryRequested -= ShowAlarmHistory;
+        }
+
+        // View-only navigation adapter. No PLC or alarm processing lives in code-behind.
+        private void ShowAlarmHistory(object? sender, EventArgs e)
+        {
+            NavigateWithPasswordGuard(_historyPage, HistoryMenuButton);
+            if (!ReferenceEquals(PageNavigation.Content, _historyPage)) return;
+            _historyViewModel.SelectedTabIndex = 3;
+            _historyViewModel.AlarmHistory.ReturnToLiveCommand.Execute(null);
+            HistoryMenuButton.IsChecked = true;
         }
 
         private void MenuToggleButton_Checked(object sender, RoutedEventArgs e)

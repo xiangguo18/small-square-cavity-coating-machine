@@ -3,57 +3,80 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
-             d:DesignHeight="580"
-             d:DesignWidth="1000">
+             mc:Ignorable="d" d:DesignHeight="580" d:DesignWidth="1400">
     <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <StackPanel Margin="0,0,0,10" Orientation="Horizontal" VerticalAlignment="Center">
-            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="开始时间"/>
-            <DatePicker Style="{StaticResource HistoryDatePickerStyle}"
-                        SelectedDate="{Binding StartDate}"/>
-            <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
-                     Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}"/>
-            <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="结束时间"/>
-            <DatePicker Style="{StaticResource HistoryDatePickerStyle}"
-                        SelectedDate="{Binding EndDate}"/>
-            <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
-                     Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}"/>
-            <Button Width="82" Height="32" Margin="0,0,8,0"
-                    Content="查询" Command="{Binding QueryCoreCommand}"/>
-            <Button Width="90" Height="32"
-                    Content="重置时间" Command="{Binding ClearFiltersCommand}"/>
+        <StackPanel>
+            <WrapPanel Margin="0,0,0,8" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="开始时间"/>
+                <DatePicker Style="{StaticResource HistoryDatePickerStyle}" SelectedDate="{Binding StartDate}"/>
+                <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
+                         Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Text="结束时间"/>
+                <DatePicker Style="{StaticResource HistoryDatePickerStyle}" SelectedDate="{Binding EndDate}"/>
+                <TextBox Width="78" Margin="5,0,15,0" VerticalContentAlignment="Center"
+                         Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Height="32" Padding="12,0" Margin="0,0,8,0"
+                        Content="查询历史" Command="{Binding QueryCoreCommand}"/>
+                <Button Height="32" Padding="12,0" Margin="0,0,8,0"
+                        Content="重置时间" Command="{Binding ClearFiltersCommand}"/>
+                <Button Height="32" Padding="12,0" Content="返回实时" Command="{Binding ReturnToLiveCommand}"/>
+            </WrapPanel>
+            <TextBlock Text="{Binding ModeText}" Foreground="#0078D4" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding StorageError}" Foreground="#C62828" TextWrapping="Wrap">
+                <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
+                    <DataTrigger Binding="{Binding StorageError}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </Style.Triggers></Style></TextBlock.Style>
+            </TextBlock>
         </StackPanel>
 
-        <DataGrid Grid.Row="1"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  IsReadOnly="True"
-                  ItemsSource="{Binding Records}"
-                  HeadersVisibility="Column"
-                  RowHeaderWidth="0"
-                  EnableRowVirtualization="True"
-                  GridLinesVisibility="Horizontal">
+        <Border Grid.Row="1" Background="#FFF4DC" BorderBrush="#E7BC60" BorderThickness="1" Padding="8" Margin="0,0,0,8">
+            <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers><DataTrigger Binding="{Binding IsSimulation}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger></Style.Triggers>
+            </Style></Border.Style>
+            <WrapPanel DataContext="{Binding Simulation}">
+                <TextBlock Text="模拟验证（不连接PLC）" Foreground="#945D00" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <ComboBox Width="250" ItemsSource="{Binding Definitions}" SelectedItem="{Binding SelectedDefinition}"
+                          DisplayMemberPath="DisplayMessage" Margin="0,0,8,0"/>
+                <Button Content="触发" Command="{Binding RaiseCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                <Button Content="恢复" Command="{Binding ClearCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                <Button Content="质量异常" Command="{Binding BadQualityCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                <Button Content="断线" Command="{Binding DisconnectCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                <Button Content="重连" Command="{Binding ReconnectCommand}" Padding="10,3"/>
+            </WrapPanel>
+        </Border>
+
+        <DataGrid Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  IsReadOnly="True" ItemsSource="{Binding Records}" HeadersVisibility="Column" RowHeaderWidth="0"
+                  EnableRowVirtualization="True" GridLinesVisibility="Horizontal" MinRowHeight="30">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="ToolTip" Value="{Binding RowNote}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Record.Priority}" Value="7"><Setter Property="Foreground" Value="#C62828"/></DataTrigger>
+                        <DataTrigger Binding="{Binding Record.Priority}" Value="6"><Setter Property="Foreground" Value="#A85800"/></DataTrigger>
+                        <DataTrigger Binding="{Binding Record.StatusText}" Value="已清除"><Setter Property="Foreground" Value="#607D8B"/></DataTrigger>
+                        <DataTrigger Binding="{Binding Record.StatusText}" Value="状态未知"><Setter Property="Foreground" Value="#755C7D"/></DataTrigger>
+                        <DataTrigger Binding="{Binding IsOutsideRange}" Value="True"><Setter Property="Background" Value="#FFF4DC"/></DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn Width="170" Header="报警时间"
-                                    Binding="{Binding OccurredAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
-                <DataGridTextColumn Width="90" Header="等级" Binding="{Binding Severity}"/>
-                <DataGridTextColumn Width="145" Header="设备/来源" Binding="{Binding Source}"/>
-                <DataGridTextColumn Width="*" MinWidth="240" Header="报警内容" Binding="{Binding Message}"/>
-                <DataGridTextColumn Width="170" Header="清除时间"
-                                    Binding="{Binding ClearedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
-                <DataGridTextColumn Width="90" Header="状态" Binding="{Binding StatusText}"/>
-                <DataGridTextColumn Width="70" Header="来源" Binding="{Binding DataSourceText}"/>
+                <DataGridTextColumn Width="185" Header="报警时间" Binding="{Binding Record.OccurredAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
+                <DataGridTextColumn Width="65" Header="等级" Binding="{Binding Record.Severity}"/>
+                <DataGridTextColumn Width="100" Header="设备/来源" Binding="{Binding Record.Source}"/>
+                <DataGridTextColumn Width="*" MinWidth="200" Header="报警内容" Binding="{Binding Record.Message}"/>
+                <DataGridTextColumn Width="185" Header="清除时间" Binding="{Binding Record.ClearedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
+                <DataGridTextColumn Width="85" Header="状态" Binding="{Binding Record.StatusText}"/>
+                <DataGridTextColumn Width="60" Header="来源" Binding="{Binding Record.DataSourceText}"/>
+                <DataGridTextColumn Width="180" Header="说明" Binding="{Binding RowNote}"/>
             </DataGrid.Columns>
         </DataGrid>
-
-        <TextBlock Grid.Row="2" Margin="2,8,0,0"
-                   Foreground="#607D8B" Text="{Binding StatusMessage}"/>
+        <TextBlock Grid.Row="3" Margin="2,8,0,0" Foreground="#607D8B" Text="{Binding StatusMessage}"/>
     </Grid>
 </UserControl>

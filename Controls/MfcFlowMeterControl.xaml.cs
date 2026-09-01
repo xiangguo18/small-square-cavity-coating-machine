@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace Small_square_cavity_coating_machine.Controls;
 
@@ -48,6 +50,13 @@ public partial class MfcFlowMeterControl : UserControl
             typeof(MfcFlowMeterControl),
             new FrameworkPropertyMetadata("0.0"));
 
+    public static readonly DependencyProperty SetpointCommandProperty =
+        DependencyProperty.Register(
+            nameof(SetpointCommand),
+            typeof(ICommand),
+            typeof(MfcFlowMeterControl),
+            new FrameworkPropertyMetadata(null));
+
     public string DisplayName
     {
         get => (string)GetValue(DisplayNameProperty);
@@ -76,5 +85,69 @@ public partial class MfcFlowMeterControl : UserControl
     {
         get => (string)GetValue(ValueFormatProperty);
         set => SetValue(ValueFormatProperty, value);
+    }
+
+    public ICommand? SetpointCommand
+    {
+        get => (ICommand?)GetValue(SetpointCommandProperty);
+        set => SetValue(SetpointCommandProperty, value);
+    }
+
+    private void SetpointTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (!double.TryParse(
+                SetpointTextBox.Text,
+                NumberStyles.Float,
+                CultureInfo.CurrentCulture,
+                out var requestedValue)
+            || !double.IsFinite(requestedValue)
+            || requestedValue < 0d)
+        {
+            ShowInvalidSetpoint();
+            return;
+        }
+
+        if (SetpointCommand is null)
+        {
+            SetCurrentValue(SetpointFlowProperty, requestedValue);
+        }
+        else if (SetpointCommand.CanExecute(requestedValue))
+        {
+            SetpointCommand.Execute(requestedValue);
+        }
+
+        RestoreSetpointText();
+        Keyboard.ClearFocus();
+    }
+
+    private void SetpointTextBox_LostKeyboardFocus(
+        object sender,
+        KeyboardFocusChangedEventArgs e)
+    {
+        RestoreSetpointText();
+    }
+
+    private void ShowInvalidSetpoint()
+    {
+        MessageBox.Show(
+            Window.GetWindow(this),
+            "设定流量必须是大于或等于 0 的数字。",
+            "MFC流量设置",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        RestoreSetpointText();
+        SetpointTextBox.Focus();
+        SetpointTextBox.SelectAll();
+    }
+
+    private void RestoreSetpointText()
+    {
+        SetpointTextBox.Text = SetpointFlow.ToString(ValueFormat, CultureInfo.CurrentCulture);
     }
 }

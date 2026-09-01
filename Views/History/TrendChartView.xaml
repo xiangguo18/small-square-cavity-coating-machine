@@ -8,8 +8,33 @@
              d:DesignHeight="580"
              d:DesignWidth="1000">
     <UserControl.Resources>
+        <Style x:Key="TrendLegendLineStyle" TargetType="Line">
+            <Setter Property="X1" Value="0"/>
+            <Setter Property="X2" Value="40"/>
+            <Setter Property="Y1" Value="6"/>
+            <Setter Property="Y2" Value="6"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="StrokeThickness" Value="3"/>
+            <Setter Property="Margin" Value="6,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="TrendLegendCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,22,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="TrendOptionalStatusStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            <Style.Triggers>
+                <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+            </Style.Triggers>
+        </Style>
         <DataTemplate x:Key="TrendStatusTemplate">
             <StackPanel Margin="8,5,8,3">
+                <TextBlock Text="{Binding AcquisitionStatus}" Foreground="#607D8B" Style="{StaticResource TrendOptionalStatusStyle}"/>
+                <TextBlock Text="{Binding RecordingError}" Foreground="#C62828" Style="{StaticResource TrendOptionalStatusStyle}"/>
                 <TextBlock Text="{Binding CurrentFileName}"
                            FontWeight="SemiBold"
                            Foreground="#334A5F"
@@ -62,15 +87,26 @@
                     </Grid.RowDefinitions>
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource TrendStatusTemplate}"/>
-                    <StackPanel Grid.Row="1"
+                    <WrapPanel Grid.Row="1"
                                 Margin="8,4,8,7"
                                 Orientation="Horizontal">
-                        <CheckBox Margin="0,0,22,0"
-                                  Content="高真空度计"
-                                  IsChecked="{Binding ShowHighVacuum}"/>
-                        <CheckBox Content="薄膜高真空度计"
-                                  IsChecked="{Binding ShowFilmHighVacuum}"/>
-                    </StackPanel>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="高真空度计"
+                                  IsChecked="{Binding ShowHighVacuum}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Red"/>
+                                <TextBlock Text="高真空度计"/>
+                            </StackPanel>
+                        </CheckBox>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="薄膜高真空度计"
+                                  IsChecked="{Binding ShowFilmHighVacuum}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Blue"/>
+                                <TextBlock Text="薄膜高真空度计"/>
+                            </StackPanel>
+                        </CheckBox>
+                    </WrapPanel>
                     <oxy:PlotView Grid.Row="2"
                                   Model="{Binding VacuumPlotModel}"/>
                 </Grid>
@@ -85,21 +121,42 @@
                     </Grid.RowDefinitions>
                     <ContentControl Content="{Binding}"
                                     ContentTemplate="{StaticResource TrendStatusTemplate}"/>
-                    <StackPanel Grid.Row="1"
+                    <WrapPanel Grid.Row="1"
                                 Margin="8,4,8,7"
                                 Orientation="Horizontal">
-                        <CheckBox Margin="0,0,22,0"
-                                  Content="电源1电压"
-                                  IsChecked="{Binding ShowPower1Voltage}"/>
-                        <CheckBox Margin="0,0,22,0"
-                                  Content="电源1电流"
-                                  IsChecked="{Binding ShowPower1Current}"/>
-                        <CheckBox Margin="0,0,22,0"
-                                  Content="电源2电压"
-                                  IsChecked="{Binding ShowPower2Voltage}"/>
-                        <CheckBox Content="电源2电流"
-                                  IsChecked="{Binding ShowPower2Current}"/>
-                    </StackPanel>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="电源1电压"
+                                  IsChecked="{Binding ShowPower1Voltage}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Red"/>
+                                <TextBlock Text="电源1电压"/>
+                            </StackPanel>
+                        </CheckBox>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="电源1电流"
+                                  IsChecked="{Binding ShowPower1Current}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Red" StrokeDashArray="4,1"/>
+                                <TextBlock Text="电源1电流"/>
+                            </StackPanel>
+                        </CheckBox>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="电源2电压"
+                                  IsChecked="{Binding ShowPower2Voltage}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Blue"/>
+                                <TextBlock Text="电源2电压"/>
+                            </StackPanel>
+                        </CheckBox>
+                        <CheckBox Style="{StaticResource TrendLegendCheckBoxStyle}"
+                                  AutomationProperties.Name="电源2电流"
+                                  IsChecked="{Binding ShowPower2Current}">
+                            <StackPanel Orientation="Horizontal">
+                                <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Blue" StrokeDashArray="4,1"/>
+                                <TextBlock Text="电源2电流"/>
+                            </StackPanel>
+                        </CheckBox>
+                    </WrapPanel>
                     <oxy:PlotView Grid.Row="2"
                                   Model="{Binding PowerPlotModel}"/>
                 </Grid>
@@ -116,8 +173,15 @@
                                     ContentTemplate="{StaticResource TrendStatusTemplate}"/>
                     <CheckBox Grid.Row="1"
                               Margin="8,4,8,7"
-                              Content="温度"
-                              IsChecked="{Binding ShowTemperature}"/>
+                              Style="{StaticResource TrendLegendCheckBoxStyle}"
+                              HorizontalAlignment="Left"
+                              AutomationProperties.Name="温度"
+                              IsChecked="{Binding ShowTemperature}">
+                        <StackPanel Orientation="Horizontal">
+                            <Line Style="{StaticResource TrendLegendLineStyle}" Stroke="Red"/>
+                            <TextBlock Text="温度"/>
+                        </StackPanel>
+                    </CheckBox>
                     <oxy:PlotView Grid.Row="2"
                                   Model="{Binding TemperaturePlotModel}"/>
                 </Grid>
@@ -143,7 +207,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Text="模拟数据模式（1秒 = 1分钟）"
+            <TextBlock Text="模拟数据模式（每1秒记录）"
                        VerticalAlignment="Center"
                        FontWeight="SemiBold"
                        Foreground="#8A5800"/>

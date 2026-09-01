@@ -46,6 +46,7 @@
                                               OffText="停止"
                                               IsInterlockReleased="{Binding IsInterlockReleased, ElementName=Root}"
                                               IsFaulted="{Binding IsFaulted, ElementName=Root}"
+                                              ShowInterlockIndicator="False"
                                               Command="{Binding ToggleCommand, ElementName=Root}"/>
             </Grid>
 

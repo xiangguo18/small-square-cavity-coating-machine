@@ -1,32 +1,43 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Models.Alarms;
+using Small_square_cavity_coating_machine.Models.Equipment;
+using Small_square_cavity_coating_machine.Services.Alarms;
+using Small_square_cavity_coating_machine.Services.Equipment;
 using Small_square_cavity_coating_machine.Services.Security;
 using System.Collections.ObjectModel;
 
 namespace Small_square_cavity_coating_machine.ViewModels.Security;
 
-public sealed partial class UserManagementViewModel : ObservableObject
+public sealed partial class UserManagementViewModel : ObservableObject, IDisposable
 {
     private readonly IUserRepository _repository;
     private readonly IUserSession _session;
     private readonly IAuthorizationService _authorization;
     private readonly IAuthenticationService _authentication;
     private readonly IUserManagementDialogService _dialogService;
+    private readonly IEquipmentControlService? _controlService;
+    private readonly IUiDispatcher? _dispatcher;
 
     public UserManagementViewModel(
         IUserRepository repository,
         IUserSession session,
         IAuthorizationService authorization,
         IAuthenticationService authentication,
-        IUserManagementDialogService dialogService)
+        IUserManagementDialogService dialogService,
+        IEquipmentControlService? controlService = null,
+        IUiDispatcher? dispatcher = null)
     {
         _repository = repository;
         _session = session;
         _authorization = authorization;
         _authentication = authentication;
         _dialogService = dialogService;
+        _controlService = controlService;
+        _dispatcher = dispatcher;
         _authorization.AccessChanged += Authorization_AccessChanged;
+        if (_controlService is not null) _controlService.Changed += ControlServiceChanged;
 
         foreach (var permission in PermissionCatalog.All)
         {
@@ -35,6 +46,7 @@ public sealed partial class UserManagementViewModel : ObservableObject
 
         ReloadUsers();
         SelectedUser = Users.FirstOrDefault();
+        RefreshInterlockState();
     }
 
     public ObservableCollection<UserAccount> Users { get; } = [];
@@ -42,6 +54,10 @@ public sealed partial class UserManagementViewModel : ObservableObject
     public ObservableCollection<PermissionOptionViewModel> PermissionOptions { get; } = [];
 
     public bool CanManageUsers => _authorization.CanOperate(PermissionKey.UserManagement);
+
+    public bool CanToggleMaintenanceInterlock => _session.CurrentUser?.IsBuiltInAdministrator == true;
+
+    public string MaintenanceInterlockButtonText => IsMaintenanceInterlockBypassed ? "互锁恢复" : "互锁解除";
 
     public bool IsGuest => !_session.IsAuthenticated;
 
@@ -101,6 +117,10 @@ public sealed partial class UserManagementViewModel : ObservableObject
 
     [ObservableProperty]
     private bool isStatusError;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MaintenanceInterlockButtonText))]
+    private bool isMaintenanceInterlockBypassed;
 
     partial void OnSelectedUserChanged(UserAccount? value)
     {
@@ -292,6 +312,34 @@ public sealed partial class UserManagementViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordHintText));
         OnPropertyChanged(nameof(CanDelete));
         DeleteCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanToggleMaintenanceInterlock));
+        ToggleMaintenanceInterlockCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanToggleMaintenanceInterlock))]
+    private async Task ToggleMaintenanceInterlockAsync()
+    {
+        if (_controlService is null)
+        {
+            SetStatus("互锁控制服务未加载。", true);
+            return;
+        }
+        var target = !IsMaintenanceInterlockBypassed;
+        var result = await _controlService.SetPassInterlockAsync(target).ConfigureAwait(false);
+        PostToUi(() => SetStatus(result.Message, result.Outcome != ControlWriteOutcome.Confirmed));
+    }
+
+    private void ControlServiceChanged(object? sender, EventArgs e)
+    {
+        if (_dispatcher is null) RefreshInterlockState();
+        else _dispatcher.Post(RefreshInterlockState);
+    }
+
+    private void RefreshInterlockState()
+    {
+        var point = _controlService?.Point(EquipmentGroups.PassInterlock);
+        IsMaintenanceInterlockBypassed = point is { Quality: AlarmQuality.Good, Value: true };
+        ApplicationStatusViewModel.Instance.MaintenanceBypassActive = IsMaintenanceInterlockBypassed;
     }
 
     public void NotifyRestrictedAccountEditorClicked()
@@ -404,5 +452,17 @@ public sealed partial class UserManagementViewModel : ObservableObject
     {
         StatusMessage = message;
         IsStatusError = isError;
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (_dispatcher is null) action();
+        else _dispatcher.Post(action);
+    }
+
+    public void Dispose()
+    {
+        _authorization.AccessChanged -= Authorization_AccessChanged;
+        if (_controlService is not null) _controlService.Changed -= ControlServiceChanged;
     }
 }

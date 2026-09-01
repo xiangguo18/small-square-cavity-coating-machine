@@ -80,6 +80,34 @@ public partial class SampleStageSpeedControl : UserControl
             typeof(SampleStageSpeedControl),
             new FrameworkPropertyMetadata(null));
 
+    public static readonly DependencyProperty ShowDirectionControlsProperty =
+        DependencyProperty.Register(
+            nameof(ShowDirectionControls),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(true));
+
+    public static readonly DependencyProperty ShowStatusIndicatorProperty =
+        DependencyProperty.Register(
+            nameof(ShowStatusIndicator),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsRunningProperty =
+        DependencyProperty.Register(
+            nameof(IsRunning),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
+    public static readonly DependencyProperty IsFaultedProperty =
+        DependencyProperty.Register(
+            nameof(IsFaulted),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
     public string DisplayName
     {
         get => (string)GetValue(DisplayNameProperty);
@@ -132,6 +160,30 @@ public partial class SampleStageSpeedControl : UserControl
     {
         get => (ICommand?)GetValue(ReverseCommandProperty);
         set => SetValue(ReverseCommandProperty, value);
+    }
+
+    public bool ShowDirectionControls
+    {
+        get => (bool)GetValue(ShowDirectionControlsProperty);
+        set => SetValue(ShowDirectionControlsProperty, value);
+    }
+
+    public bool ShowStatusIndicator
+    {
+        get => (bool)GetValue(ShowStatusIndicatorProperty);
+        set => SetValue(ShowStatusIndicatorProperty, value);
+    }
+
+    public bool IsRunning
+    {
+        get => (bool)GetValue(IsRunningProperty);
+        set => SetValue(IsRunningProperty, value);
+    }
+
+    public bool IsFaulted
+    {
+        get => (bool)GetValue(IsFaultedProperty);
+        set => SetValue(IsFaultedProperty, value);
     }
 
     private void SetpointTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
