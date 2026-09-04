@@ -106,17 +106,15 @@ public sealed class SqliteEquipmentDefinitionRepository(string path) : IEquipmen
         var commands = new Dictionary<int, PartCommandDefinition>();
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT Id,PartId,Command,Chinese,Node,EnableNode,Info,InterlockNode FROM PartCommand ORDER BY Id";
+            command.CommandText = "SELECT Id,PartId,Command,Chinese,Node,Info,InterlockNode FROM PartCommand ORDER BY Id";
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
                 string Text(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i).Trim();
                 var row = new PartCommandDefinition(reader.GetInt32(0), reader.GetInt32(1), Text(2), Text(3),
-                    Text(4), Text(5), Text(6), Text(7));
+                    Text(4), Text(5), Text(6));
                 EquipmentAddress.Index(row.Address, EquipmentGroups.PartCommand);
-                EquipmentAddress.Index(row.EnableAddress, EquipmentGroups.PartCommandEnable);
-                if (EquipmentAddress.Index(row.Address, EquipmentGroups.PartCommand) != row.Id
-                    || EquipmentAddress.Index(row.EnableAddress, EquipmentGroups.PartCommandEnable) != row.Id)
+                if (EquipmentAddress.Index(row.Address, EquipmentGroups.PartCommand) != row.Id)
                     throw new InvalidOperationException($"PartCommand编号与数组下标不一致：{row.Id}");
                 if (!string.IsNullOrWhiteSpace(row.InterlockAddress))
                     EquipmentAddress.Index(row.InterlockAddress, EquipmentGroups.Interlock);
@@ -154,16 +152,16 @@ public sealed class SqliteEquipmentDefinitionRepository(string path) : IEquipmen
         var systemCommands = new Dictionary<string, SystemCommandDefinition>(StringComparer.Ordinal);
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT Name,Chinese,CommandNode,EnableNode,FeedbackNode,RequiresBuiltInAdmin FROM SystemCommandDef ORDER BY Name";
+            command.CommandText = "SELECT Name,Chinese,CommandNode,FeedbackNode,RequiresBuiltInAdmin FROM SystemCommandDef ORDER BY Name";
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
                 string Text(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i).Trim();
-                var row = new SystemCommandDefinition(Text(0), Text(1), Text(2), Text(3), Text(4), reader.GetInt32(5) != 0);
+                // EnableNode 为历史兼容字段，运行时不再读取其内容（使能由 PLC 内部处理）。
+                var row = new SystemCommandDefinition(Text(0), Text(1), Text(2), "", Text(3), reader.GetInt32(4) != 0);
                 if (string.IsNullOrWhiteSpace(row.Name) || string.IsNullOrWhiteSpace(row.CommandAddress))
                     throw new InvalidOperationException("SystemCommandDef名称或命令地址为空");
                 ValidateScalar(row.CommandAddress, "系统命令");
-                if (!string.IsNullOrWhiteSpace(row.EnableAddress)) ValidateScalar(row.EnableAddress, "系统使能");
                 if (!string.IsNullOrWhiteSpace(row.FeedbackAddress)) ValidateScalar(row.FeedbackAddress, "系统反馈");
                 if (!systemCommands.TryAdd(row.Name, row)) throw new InvalidOperationException($"SystemCommandDef重复：{row.Name}");
             }
@@ -194,7 +192,7 @@ public sealed class SqliteEquipmentDefinitionRepository(string path) : IEquipmen
         ValidateUnique(interlocks.Values.Select(i => i.Address), interlocks.Keys);
 
         var addresses = parts.Values.Select(p => p.StateAddress)
-            .Concat(commands.Values.SelectMany(p => new[] { p.Address, p.EnableAddress, p.InterlockAddress }))
+            .Concat(commands.Values.SelectMany(p => new[] { p.Address, p.InterlockAddress }))
             .Concat(data.Values.SelectMany(p => new[] { p.Address, p.SetAddress }))
             .Concat(systemCommands.Values.SelectMany(p => new[] { p.CommandAddress, p.EnableAddress, p.FeedbackAddress }))
             .Concat(interlocks.Values.Select(p => p.Address))

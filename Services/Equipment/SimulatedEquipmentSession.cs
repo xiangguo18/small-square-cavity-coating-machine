@@ -15,7 +15,6 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
     private readonly float[] _recipe = new float[24];
     private readonly float[] _process;
     private readonly bool[] _partCommands = new bool[1000];
-    private readonly bool[] _partCommandEnable = Enumerable.Repeat(true, 1000).ToArray();
     private readonly ushort[] _partStates = Enumerable.Repeat((ushort)1, 500).ToArray();
     private readonly float[] _partData = new float[27];
     private readonly float[] _partDataSet1 = new float[21];
@@ -31,7 +30,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
         _processDefinitions = processDefinitions ?? [];
         _process = new float[Math.Max(8, _processDefinitions.Select(p => EquipmentAddress.Index(p.Address, EquipmentGroups.Process)).DefaultIfEmpty(7).Max() + 1)];
         foreach (var definition in parameters) _parameters[EquipmentAddress.Index(definition.Address, EquipmentGroups.Parameter)] = (float)definition.Value;
-        foreach (var point in EquipmentGroups.SystemControlPoints) _scalars[point] = point.EndsWith("_En", StringComparison.Ordinal);
+        foreach (var point in EquipmentGroups.SystemControlPoints) _scalars[point] = false;
         _partData[0] = _partDataSet1[0] = 80f;
         _partData[1] = _partDataSet1[1] = 45f;
         _partData[2] = _partDataSet1[2] = 186.5f;
@@ -69,8 +68,8 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
     private Array Values(string group) => group switch {
         EquipmentGroups.Alarm => _alarms, EquipmentGroups.Io => _io,
         EquipmentGroups.Parameter => _parameters, EquipmentGroups.Process => _process, EquipmentGroups.Recipe => _recipe,
-        EquipmentGroups.PartCommand => _partCommands, EquipmentGroups.PartCommandEnable => _partCommandEnable,
-        EquipmentGroups.PartState => _partStates, EquipmentGroups.PartData => _partData,
+        EquipmentGroups.PartCommand => _partCommands, EquipmentGroups.PartState => _partStates,
+        EquipmentGroups.PartData => _partData,
         EquipmentGroups.PartDataSet1 => _partDataSet1, EquipmentGroups.PartDataSet2 => _partDataSet2,
         EquipmentGroups.Interlock => _interlocks, _ => throw new ArgumentException(group) };
 
@@ -147,6 +146,22 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
             }
         }
 
+        public Task WriteArrayElementsAsync(string group, IReadOnlyList<ArrayWriteMutation> mutations, CancellationToken token)
+        {
+            lock (owner._gate)
+            {
+                token.ThrowIfCancellationRequested();
+                if (_disposed || !owner._online) throw new InvalidOperationException("模拟连接已断开");
+                foreach (var mutation in mutations)
+                {
+                    owner.Values(group).SetValue(mutation.Value, mutation.Index);
+                    ApplyFeedback(group, mutation.Index, mutation.Value);
+                }
+                Publish(group);
+                return Task.CompletedTask;
+            }
+        }
+
         private void ApplyFeedback(string group, int? index, object value)
         {
             if (group == EquipmentGroups.PartCommand && value is true && index.HasValue)
@@ -154,6 +169,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
                 (int Part, bool Open) state = index.Value switch
                 {
                     0 => (0, true), 1 => (0, false), 2 => (1, true), 3 => (1, false),
+                    6 => (2, true), 7 => (2, false),
                     8 => (3, true), 9 => (3, false),
                     10 => (4, true), 11 => (4, true), 12 => (4, false),
                     13 => (5, true), 14 => (5, false),

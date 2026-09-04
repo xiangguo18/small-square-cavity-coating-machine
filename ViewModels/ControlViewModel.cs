@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Services;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Security;
 
@@ -15,6 +16,7 @@ public partial class ControlViewModel : ObservableObject
 {
     private readonly IOperationLogRepository? _operationLogRepository;
     private readonly IAuthorizationService? _authorization;
+    private readonly IConfirmationDialogService? _confirmation;
 
     public ControlViewModel()
     {
@@ -27,10 +29,12 @@ public partial class ControlViewModel : ObservableObject
 
     public ControlViewModel(
         IOperationLogRepository operationLogRepository,
-        IAuthorizationService? authorization)
+        IAuthorizationService? authorization,
+        IConfirmationDialogService? confirmation = null)
     {
         _operationLogRepository = operationLogRepository;
         _authorization = authorization;
+        _confirmation = confirmation;
         if (_authorization is not null)
         {
             _authorization.AccessChanged += Authorization_AccessChanged;
@@ -418,6 +422,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleLowerForelineValve()
     {
         if (!EnsureCanOperate()) return;
+        if (!LowerForelineValveIsOpen && !ConfirmAction("放气阀操作确认", "确定打开放气阀？")) return;
         if (TryQueuePartToggle("VentValve", LowerForelineValveIsOpen, 45, 46, "放气阀")) return;
         LowerForelineValveIsOpen = !LowerForelineValveIsOpen;
         LogOperation("下部前级阀", LowerForelineValveIsOpen ? "打开阀门" : "关闭阀门");
@@ -427,6 +432,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleTurboPump()
     {
         if (!EnsureCanOperate()) return;
+        if (!TurboPumpIsRunning && !ConfirmAction("分子泵操作确认", "确定启动分子泵？")) return;
         if (TryQueuePartToggle("TurboPump", TurboPumpIsRunning, 2, 3, "分子泵")) return;
         TurboPumpIsRunning = !TurboPumpIsRunning;
         LogOperation("分子泵", TurboPumpIsRunning ? "启动" : "停止");
@@ -521,6 +527,7 @@ public partial class ControlViewModel : ObservableObject
     private void SelectAutomaticMode()
     {
         if (!EnsureCanOperate()) return;
+        if (!ConfirmAction("运行模式确认", "确定切换到自动模式？")) return;
         if (TryQueueSystemCommand("Auto")) return;
         AutomaticModeIsSelected = true;
         SemiAutomaticModeIsSelected = false;
@@ -554,6 +561,7 @@ public partial class ControlViewModel : ObservableObject
     private void StartVacuum()
     {
         if (!EnsureCanOperate()) return;
+        if (!ConfirmAction("真空控制确认", "确定执行抽真空流程？")) return;
         if (TryQueueWorkflowCommand(980, "抽真空")) return;
         ToggleWorkflowSelection(980);
         LogOperation("系统控制", "抽真空");
@@ -563,6 +571,7 @@ public partial class ControlViewModel : ObservableObject
     private void BreakVacuum()
     {
         if (!EnsureCanOperate()) return;
+        if (!ConfirmAction("真空控制确认", "确定执行破真空流程？")) return;
         if (TryQueueWorkflowCommand(981, "破真空")) return;
         ToggleWorkflowSelection(981);
         LogOperation("系统控制", "破真空");
@@ -572,6 +581,7 @@ public partial class ControlViewModel : ObservableObject
     private void HoldPressure()
     {
         if (!EnsureCanOperate()) return;
+        if (!ConfirmAction("真空控制确认", "确定执行保压流程？")) return;
         if (TryQueueWorkflowCommand(982, "保压")) return;
         ToggleWorkflowSelection(982);
         LogOperation("系统控制", "保压");
@@ -698,7 +708,14 @@ public partial class ControlViewModel : ObservableObject
     private void SetApcPosition(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(1, value)) return;
+        if (!double.IsFinite(value) || value < 0d || value > 100d)
+        {
+            ControlStatusText = "APC开度范围：0～100 %";
+            return;
+        }
+        var action = value == 0d ? "关闭" : "开启";
+        if (!ConfirmAction("APC阀设定确认", $"确定将 APC 开度设为 {value:0.###}%（{action}）？")) return;
+        if (TryQueueApcPosition(value)) return;
         ApcPositionSetpoint = value;
         LogOperation("APC阀", "设置位置", $"{value:0.###} %");
     }
@@ -728,6 +745,9 @@ public partial class ControlViewModel : ObservableObject
 
     private bool EnsureCanOperate() =>
         _authorization?.TryAuthorize(PermissionKey.SystemStatus) ?? true;
+
+    private bool ConfirmAction(string title, string message) =>
+        _confirmation?.Confirm(title, message) ?? true;
 
     private void Authorization_AccessChanged(object? sender, EventArgs e)
     {

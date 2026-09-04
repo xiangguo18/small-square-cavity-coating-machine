@@ -286,16 +286,22 @@ public sealed class AlarmOpcUaLoopbackTests
             var writeResult = await client.WriteParameterAsync(new("EQ_Parameter1[2]", "0.25", 5f, client.Snapshot().Epoch), deadline.Token);
             Assert.Equal(ParameterWriteOutcome.Confirmed, writeResult.Outcome);
             var request = Assert.Single(server.Nodes.Writes);
-            Assert.Equal("2", request.Range);
-            Assert.Equal(0.25f, Assert.Single(Assert.IsType<float[]>(request.Value)));
+            Assert.True(string.IsNullOrEmpty(request.Range));
+            var paramWrite = Assert.IsType<float[]>(request.Value);
+            Assert.Equal(21, paramWrite.Length);
+            Assert.Equal(0.25f, paramWrite[2]);
             var after = server.Nodes.ParameterValues;
             Assert.Equal(0.25f, after[2]);
             for (var i = 0; i < 21; i++) if (i != 2) Assert.Equal(before[i], after[i]);
             server.Nodes.RejectIndexRange = true;
             var rejected = await client.WriteParameterAsync(new("EQ_Parameter1[0]", "7", 5f, client.Snapshot().Epoch), deadline.Token);
             Assert.Equal(ParameterWriteOutcome.Rejected, rejected.Outcome);
-            Assert.Equal(2, server.Nodes.Writes.Count); // no whole-array fallback or retry
-            Assert.All(server.Nodes.Writes, r => { Assert.Equal("vendor.parameters.nonmatching", r.Node.Identifier); Assert.NotEmpty(r.Range); });
+            Assert.Equal(2, server.Nodes.Writes.Count);
+            Assert.All(server.Nodes.Writes, r =>
+            {
+                Assert.Equal("vendor.parameters.nonmatching", r.Node.Identifier);
+                Assert.True(string.IsNullOrEmpty(r.Range));
+            });
             Assert.Equal(5f, server.Nodes.ParameterValues[0]);
             server.Nodes.Writes.Clear(); server.Nodes.RecipeOperations.Clear();
             var recipeGateway = new OpcUaRecipePlcGateway(client, runtime,
@@ -310,10 +316,10 @@ public sealed class AlarmOpcUaLoopbackTests
             Assert.Equal("vendor.EQ_CoatOK", recipeWrites[0].Node.Identifier); Assert.False((bool)recipeWrites[0].Value);
             Assert.Equal("vendor.EQ_CoatOK", recipeWrites[^1].Node.Identifier); Assert.True((bool)recipeWrites[^1].Value);
             foreach (var item in recipeWrites.Where(w => w.Node.Identifier.Equals("vendor.recipe.block")))
-            { Assert.Equal("0:17", item.Range); Assert.Equal(18, Assert.IsType<float[]>(item.Value).Length); }
+            { Assert.True(string.IsNullOrEmpty(item.Range)); Assert.Equal(18, Assert.IsType<float[]>(item.Value).Length); }
             Assert.All(server.Nodes.RecipeValues.Skip(18), v => Assert.Equal(99f, v));
             var ops = server.Nodes.RecipeOperations.ToArray();
-            var blocks = ops.Select((v,i) => (v,i)).Where(x => x.v == "write:array:0:17").ToArray();
+            var blocks = ops.Select((v,i) => (v,i)).Where(x => x.v == "write:array:").ToArray();
             foreach (var block in blocks)
             {
                 var reset = Array.FindIndex(ops, block.i + 1, s => s == "write:recipe:False");
@@ -324,7 +330,7 @@ public sealed class AlarmOpcUaLoopbackTests
                 new Progress<RecipeRunProgress>(), deadline.Token);
             Assert.False(rejectedRecipe.IsCompleted); Assert.Equal(2, server.Nodes.Writes.Count);
             Assert.DoesNotContain(server.Nodes.Writes, w => w.Node.Identifier.Equals("vendor.EQ_RecipeOK"));
-            Assert.Equal("0:17", server.Nodes.Writes.Last().Range);
+            Assert.True(string.IsNullOrEmpty(server.Nodes.Writes.Last().Range));
             Assert.All(server.Nodes.RecipeValues.Skip(18), v => Assert.Equal(99f, v));
             await client.DisposeAsync();
             Assert.True(double.IsNaN(telemetry.Capture(DateTimeOffset.Now).TemperatureC));

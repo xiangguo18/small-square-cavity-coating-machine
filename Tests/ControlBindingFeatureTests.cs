@@ -1,5 +1,6 @@
 using Small_square_cavity_coating_machine.Models.Equipment;
 using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Services;
 using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.Equipment;
 using Small_square_cavity_coating_machine.Services.Security;
@@ -12,6 +13,17 @@ namespace Small_square_cavity_coating_machine.Tests;
 
 public sealed class ControlBindingFeatureTests
 {
+    private sealed class ConfirmationStub : IConfirmationDialogService
+    {
+        public bool Result = true;
+        public int Calls;
+        public bool Confirm(string title, string message)
+        {
+            Calls++;
+            return Result;
+        }
+    }
+
     private sealed class Authorization : IAuthorizationService
     {
         public bool Allowed = true;
@@ -44,6 +56,8 @@ public sealed class ControlBindingFeatureTests
         Assert.Equal("Part_Data_Set1[6]", controls.Data[9].SetAddress);
         Assert.Equal("EQ_Interlock[10]", controls.Commands[27].InterlockAddress);
         Assert.Equal("EQ_Interlock[15]", controls.Commands[32].InterlockAddress);
+        Assert.Equal("EQ_Interlock[6]", controls.Commands[6].InterlockAddress);
+        Assert.Equal("EQ_Interlock[7]", controls.Commands[7].InterlockAddress);
         Assert.Equal("EQ_PassInterlock", controls.SystemCommands["PassInterlock"].CommandAddress);
         Assert.True(controls.SystemCommands["PassInterlock"].RequiresBuiltInAdministrator);
         var expectedStates = new Dictionary<int, int>
@@ -63,6 +77,9 @@ public sealed class ControlBindingFeatureTests
         var partStateAddresses = controls.Parts.Values.Select(p => p.StateAddress).Where(a => a.Length > 0).ToArray();
         Assert.Equal(partStateAddresses.Length, partStateAddresses.Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(controls.Addresses.Count, controls.Addresses.Distinct(StringComparer.Ordinal).Count());
+        Assert.DoesNotContain(controls.Addresses, a => a.StartsWith(EquipmentGroups.PartCommandEnable, StringComparison.Ordinal));
+        Assert.DoesNotContain(controls.Addresses, a => a.EndsWith("_En", StringComparison.Ordinal));
+        Assert.All(controls.SystemCommands.Values, s => Assert.Equal("", s.EnableAddress));
         Assert.Equal(before, SHA256.HashData(File.ReadAllBytes(path)));
     }
 
@@ -87,7 +104,7 @@ public sealed class ControlBindingFeatureTests
     }
 
     [Fact]
-    public async Task Commands_write_true_once_never_clear_opposite_and_honor_enable_and_interlock()
+    public async Task Execute_part_command_honors_interlock_and_confirms_observed_state()
     {
         await using var harness = await ControlHarness.CreateAsync();
         var first = await harness.Service.ExecutePartCommandAsync(13, "样品挡板", "开启");
@@ -98,15 +115,9 @@ public sealed class ControlBindingFeatureTests
         Assert.Collection(harness.Session.ControlWrites.Take(2),
             write => { Assert.Equal((EquipmentGroups.PartCommand, 13), (write.Group, write.Index)); Assert.Equal(true, write.Value); },
             write => { Assert.Equal((EquipmentGroups.PartCommand, 14), (write.Group, write.Index)); Assert.Equal(true, write.Value); });
-        Assert.True(((bool[])harness.Session.Values[EquipmentGroups.PartCommand])[13]);
-        Assert.True(((bool[])harness.Session.Values[EquipmentGroups.PartCommand])[14]);
+        // 脉冲命令不再回读命令位，程序依据 Part_State 反馈确认（样例挡板关闭后 state[5]=bit0）。
+        Assert.Equal((ushort)1, ((ushort[])harness.Session.Values[EquipmentGroups.PartState])[5]);
         Assert.DoesNotContain(harness.Session.ControlWrites, write => write.Value is false);
-
-        ((bool[])harness.Session.Values[EquipmentGroups.PartCommandEnable])[15] = false;
-        harness.Session.Send(EquipmentGroups.PartCommandEnable);
-        var disabled = await harness.Service.ExecutePartCommandAsync(15, "靶1挡板", "开启");
-        Assert.Equal(ControlWriteOutcome.Rejected, disabled.Outcome);
-        Assert.DoesNotContain(harness.Session.ControlWrites, write => write.Index == 15);
 
         ((bool[])harness.Session.Values[EquipmentGroups.Interlock])[10] = false;
         harness.Session.Send(EquipmentGroups.Interlock);
@@ -238,31 +249,35 @@ public sealed class ControlBindingFeatureTests
     }
 
     [Fact]
-    public async Task Workflow_buttons_toggle_only_after_confirmed_true_write_and_remain_mutually_exclusive()
+    public async Task Workflow_buttons_send_mutually_exclusive_commands_without_local_selection()
     {
         await using var harness = await ControlHarness.CreateAsync();
         using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
             new AlarmFeatureTests.InlineDispatcher());
 
         viewModel.StartVacuumCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => viewModel.VacuumingIsSelected);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ArrayWrites.Any(a => a.Group == EquipmentGroups.PartCommand
+                && a.Mutations.Any(m => m.Index == 980 && Equals(m.Value, true)))
+            && !harness.Client.Snapshot().IsWriting);
+        Assert.False(viewModel.VacuumingIsSelected); // 不再使用本地虚假选中状态
+
+        viewModel.BreakVacuumCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ArrayWrites.Any(a => a.Group == EquipmentGroups.PartCommand
+                && a.Mutations.Any(m => m.Index == 981 && Equals(m.Value, true)))
+            && !harness.Client.Snapshot().IsWriting);
         Assert.False(viewModel.VentingIsSelected);
-        Assert.Contains(harness.Session.ControlWrites, w => w.Group == EquipmentGroups.PartCommand && w.Index == 980 && Equals(w.Value, true));
 
-        viewModel.BreakVacuumCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => viewModel.VentingIsSelected);
-        Assert.False(viewModel.VacuumingIsSelected);
-
-        viewModel.BreakVacuumCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => !viewModel.VentingIsSelected);
-        Assert.Equal(2, harness.Session.ControlWrites.Count(w => w.Group == EquipmentGroups.PartCommand && w.Index == 981));
-        Assert.DoesNotContain(harness.Session.ControlWrites, w => w.Value is false);
-
-        ((bool[])harness.Session.Values[EquipmentGroups.PartCommandEnable])[982] = false;
-        harness.Session.Send(EquipmentGroups.PartCommandEnable);
-        viewModel.HoldPressureCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => viewModel.ControlStatusText.Contains("未使能"));
-        Assert.False(viewModel.PressureHoldingIsSelected);
+        // 流程命令无独立状态反馈，只报告“命令已发送”，并保持同组互斥（目标写 1、其余写 0）。
+        var workflow = harness.Session.ArrayWrites
+            .Where(a => a.Group == EquipmentGroups.PartCommand)
+            .SelectMany(a => a.Mutations).Where(m => m.Index is 980 or 981 or 982).ToArray();
+        Assert.Contains(workflow, m => m.Index == 980 && Equals(m.Value, true));
+        Assert.Contains(workflow, m => m.Index == 980 && Equals(m.Value, false));
+        Assert.Contains(workflow, m => m.Index == 981 && Equals(m.Value, true));
+        Assert.Contains(workflow, m => m.Index == 981 && Equals(m.Value, false));
+        Assert.Contains(workflow, m => m.Index == 982 && Equals(m.Value, false));
     }
 
     [Fact]
@@ -277,16 +292,22 @@ public sealed class ControlBindingFeatureTests
         harness.Session.Send(EquipmentGroups.PartState);
         Assert.True(viewModel.SampleShutterIsOn);
         viewModel.ToggleSampleShutterCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Any(w => w.Index == 14));
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ArrayWrites.Any(a => a.Mutations.Any(m => m.Index == 14)));
         await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
         Assert.True(viewModel.SampleShutterIsOn); // waits for Part_State, never follows command success optimistically
 
         states[5] = 1 << 0;
         harness.Session.Send(EquipmentGroups.PartState);
         viewModel.ToggleSampleShutterCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Any(w => w.Index == 13));
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ArrayWrites.Any(a => a.Mutations.Any(m => m.Index == 13 && Equals(m.Value, true))));
         Assert.False(viewModel.SampleShutterIsOn);
-        Assert.All(harness.Session.ControlWrites.Where(w => w.Index is 13 or 14), w => Assert.Equal(true, w.Value));
+        // 互斥：样品挡板开/关地址对互斥（开启时对侧写 0、目标写 1）。
+        var shutter = harness.Session.ArrayWrites.SelectMany(a => a.Mutations).Where(m => m.Index is 13 or 14).ToArray();
+        Assert.Contains(shutter, m => m.Index == 13 && Equals(m.Value, false));
+        Assert.Contains(shutter, m => m.Index == 14 && Equals(m.Value, false));
+        Assert.Contains(shutter, m => m.Index == 13 && Equals(m.Value, true));
+        Assert.Contains(shutter, m => m.Index == 14 && Equals(m.Value, true));
     }
 
     [Fact]
@@ -307,6 +328,320 @@ public sealed class ControlBindingFeatureTests
         var open = Assert.IsType<ushort[]>((await session.ReadGroupAsync(
             EquipmentGroups.PartState, null, CancellationToken.None)).Value);
         Assert.Equal((ushort)2, open[2]);
+    }
+
+    [Fact]
+    public async Task System_control_buttons_deassert_sibling_command_addresses()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.StartSystemCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ControlWrites.Any(w => w.Group == "EQ_Start" && Equals(w.Value, true))
+            && !harness.Client.Snapshot().IsWriting);
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Stop" && Equals(w.Value, false));
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Reset" && Equals(w.Value, false));
+
+        viewModel.SelectSemiAutomaticModeCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ControlWrites.Any(w => w.Group == "EQ_Semi" && Equals(w.Value, true))
+            && !harness.Client.Snapshot().IsWriting);
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Auto" && Equals(w.Value, false));
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Manual" && Equals(w.Value, false));
+    }
+
+    [Fact]
+    public async Task Apc_position_setpoint_links_to_open_close_mutual_exclusion()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.SetApcPositionCommand.Execute(0d);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ControlWrites.Any(w => w.Group == EquipmentGroups.PartDataSet1 && w.Index == 1
+                && w.Value is float f && f == 0f)
+            && !harness.Client.Snapshot().IsWriting);
+        var apc1 = harness.Session.ArrayWrites.SelectMany(a => a.Mutations).Where(m => m.Index is 6 or 7).ToArray();
+        Assert.Contains(apc1, m => m.Index == 6 && Equals(m.Value, false));
+        Assert.Contains(apc1, m => m.Index == 7 && Equals(m.Value, true));
+
+        viewModel.SetApcPositionCommand.Execute(50d);
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ControlWrites.Any(w => w.Group == EquipmentGroups.PartDataSet1 && w.Index == 1
+                && w.Value is float g && g == 50f)
+            && !harness.Client.Snapshot().IsWriting);
+        var apc2 = harness.Session.ArrayWrites.SelectMany(a => a.Mutations).Where(m => m.Index is 6 or 7).ToArray();
+        Assert.Contains(apc2, m => m.Index == 7 && Equals(m.Value, false));
+        Assert.Contains(apc2, m => m.Index == 6 && Equals(m.Value, true));
+    }
+
+    [Fact]
+    public async Task Apc_position_rejects_out_of_range_without_writes()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        var before = harness.Session.ControlWrites.Count;
+        viewModel.SetApcPositionCommand.Execute(-5d);
+        Assert.Equal("APC开度范围：0～100 %", viewModel.ControlStatusText);
+        viewModel.SetApcPositionCommand.Execute(150d);
+        Assert.Equal("APC开度范围：0～100 %", viewModel.ControlStatusText);
+        Assert.Equal(before, harness.Session.ControlWrites.Count);
+    }
+
+    [Fact]
+    public async Task Apc_position_open_close_respect_interlock_fail_closed()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var interlocks = (bool[])harness.Session.Values[EquipmentGroups.Interlock];
+
+        interlocks[6] = false;
+        harness.Session.Send(EquipmentGroups.Interlock);
+        viewModel.SetApcPositionCommand.Execute(50d);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ControlStatusText.Contains("互锁"));
+        Assert.DoesNotContain(harness.Session.ArrayWrites.SelectMany(a => a.Mutations),
+            m => m.Index == 6 && Equals(m.Value, true));
+        Assert.DoesNotContain(harness.Session.ControlWrites, w => w.Group == EquipmentGroups.PartDataSet1 && w.Index == 1);
+
+        interlocks[6] = true;
+        interlocks[7] = false;
+        harness.Session.Send(EquipmentGroups.Interlock);
+        viewModel.SetApcPositionCommand.Execute(0d);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ControlStatusText.Contains("互锁"));
+        Assert.DoesNotContain(harness.Session.ArrayWrites.SelectMany(a => a.Mutations),
+            m => m.Index == 7 && Equals(m.Value, true));
+        Assert.DoesNotContain(harness.Session.ControlWrites, w => w.Group == EquipmentGroups.PartDataSet1 && w.Index == 1);
+    }
+
+    [Fact]
+    public async Task Confirmation_aborts_apc_position_setpoint_when_declined()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var confirmation = new ConfirmationStub { Result = false };
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher(), confirmation);
+
+        var positionBefore = viewModel.ApcPositionSetpoint;
+        viewModel.SetApcPositionCommand.Execute(50d);
+        Assert.Equal(1, confirmation.Calls);
+        Assert.Equal(positionBefore, viewModel.ApcPositionSetpoint);
+        Assert.Empty(harness.Session.ControlWrites);
+    }
+
+    [Fact]
+    public async Task Confirmation_aborts_auto_mode_when_declined()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var confirmation = new ConfirmationStub { Result = false };
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher(), confirmation);
+
+        var writesBefore = harness.Session.ControlWrites.Count;
+        viewModel.SelectAutomaticModeCommand.Execute(null);
+        Assert.Equal(1, confirmation.Calls);
+        Assert.False(viewModel.AutomaticModeIsSelected);
+        Assert.Equal(writesBefore, harness.Session.ControlWrites.Count);
+    }
+
+    [Fact]
+    public async Task Confirmation_aborts_vacuum_workflow_when_declined()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var confirmation = new ConfirmationStub { Result = false };
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher(), confirmation);
+
+        var writesBefore = harness.Session.ControlWrites.Count;
+        viewModel.StartVacuumCommand.Execute(null);
+        viewModel.BreakVacuumCommand.Execute(null);
+        viewModel.HoldPressureCommand.Execute(null);
+        Assert.Equal(3, confirmation.Calls);
+        Assert.Equal(writesBefore, harness.Session.ControlWrites.Count);
+    }
+
+    [Fact]
+    public async Task Confirmation_only_asks_when_opening_vent_or_turbo_pump()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var confirmation = new ConfirmationStub { Result = false };
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, confirmation);
+
+        // 放气阀：当前关闭 → 打开时弹窗（取消则不动）
+        viewModel.LowerForelineValveIsOpen = false;
+        viewModel.ToggleLowerForelineValveCommand.Execute(null);
+        Assert.Equal(1, confirmation.Calls);
+        Assert.False(viewModel.LowerForelineValveIsOpen);
+
+        // 放气阀：当前打开 → 关闭时不弹窗
+        confirmation.Calls = 0;
+        viewModel.LowerForelineValveIsOpen = true;
+        viewModel.ToggleLowerForelineValveCommand.Execute(null);
+        Assert.Equal(0, confirmation.Calls);
+        Assert.False(viewModel.LowerForelineValveIsOpen);
+
+        // 分子泵：当前停止 → 启动时弹窗（取消则不动）
+        confirmation.Calls = 0;
+        viewModel.TurboPumpIsRunning = false;
+        viewModel.ToggleTurboPumpCommand.Execute(null);
+        Assert.Equal(1, confirmation.Calls);
+        Assert.False(viewModel.TurboPumpIsRunning);
+
+        // 分子泵：当前运行 → 停止时不弹窗
+        confirmation.Calls = 0;
+        viewModel.TurboPumpIsRunning = true;
+        viewModel.ToggleTurboPumpCommand.Execute(null);
+        Assert.Equal(0, confirmation.Calls);
+        Assert.False(viewModel.TurboPumpIsRunning);
+    }
+
+    [Fact]
+    public async Task Control_points_initialize_when_server_omits_part_command_enable_and_engine_enable_nodes()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        Assert.True(harness.Client.Snapshot().IsConnected);
+        Assert.DoesNotContain(harness.Session.Subscribed, g => g == EquipmentGroups.PartCommandEnable);
+        Assert.DoesNotContain(harness.Session.Subscribed, g => g.EndsWith("_En", StringComparison.Ordinal));
+        Assert.True(harness.Client.Snapshot().Groups[EquipmentGroups.PartCommand].IsReady);
+        Assert.True(harness.Client.Snapshot().Groups[EquipmentGroups.Interlock].IsReady);
+    }
+
+    [Fact]
+    public async Task Sixteen_device_interlocks_gate_open_close_individually_without_swapping()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        var pairs = new (int OpenCmd, int OpenInt, int CloseCmd, int CloseInt)[]
+        {
+            (41, 0, 42, 1),   // 粗抽阀
+            (43, 2, 44, 3),   // 前级阀
+            (39, 4, 40, 5),   // 薄膜规前级阀
+            (6, 6, 7, 7),     // 插板阀
+            (45, 8, 46, 9),   // 破空阀
+            (27, 10, 28, 11), // MFC Ar
+            (35, 12, 36, 13), // MFC N₂
+            (31, 14, 32, 15), // MFC O₂
+        };
+        foreach (var (openCmd, openInt, closeCmd, closeInt) in pairs)
+        {
+            var interlocks = (bool[])harness.Session.Values[EquipmentGroups.Interlock];
+            Array.Fill(interlocks, true);
+            interlocks[openInt] = false;
+            harness.Session.Send(EquipmentGroups.Interlock);
+            Assert.Equal(ControlWriteOutcome.Rejected,
+                (await harness.Service.ExecutePartCommandAsync(openCmd, "设备", "开启")).Outcome);
+
+            Array.Fill(interlocks, true);
+            interlocks[closeInt] = false;
+            harness.Session.Send(EquipmentGroups.Interlock);
+            Assert.Equal(ControlWriteOutcome.Confirmed,
+                (await harness.Service.ExecutePartCommandAsync(openCmd, "设备", "开启")).Outcome); // 打开不受关闭互锁影响
+
+            Array.Fill(interlocks, true);
+            interlocks[closeInt] = false;
+            harness.Session.Send(EquipmentGroups.Interlock);
+            Assert.Equal(ControlWriteOutcome.Rejected,
+                (await harness.Service.ExecutePartCommandAsync(closeCmd, "设备", "关闭")).Outcome);
+
+            Array.Fill(interlocks, true);
+            interlocks[openInt] = false;
+            harness.Session.Send(EquipmentGroups.Interlock);
+            Assert.Equal(ControlWriteOutcome.Confirmed,
+                (await harness.Service.ExecutePartCommandAsync(closeCmd, "设备", "关闭")).Outcome); // 关闭不受打开互锁影响
+        }
+    }
+
+    [Fact]
+    public async Task Part_command_state_confirmation_reports_success_fault_and_timeout()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        // 成功：命令写入后 Part_State 到位 → Confirmed，且不再回读命令位（无 5 秒级等待）。
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(13, "样品挡板", "开启")).Outcome);
+
+        // 故障：Part_State bit7 → Rejected（故障提示）。
+        harness.Session.ApplyFeedback = false;
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+        states[5] = (ushort)(1 << 7);
+        harness.Session.Send(EquipmentGroups.PartState);
+        var snapshot = harness.Client.Snapshot();
+        var fault = await harness.Client.WriteControlAsync(new ControlWriteRequest(
+            "Part_Command[13]", true, snapshot.Epoch, "样品挡板", "开启", PermissionKey.SystemStatus,
+            Confirm: ControlConfirm.State, StateAddress: "Part_State[5]", ExpectOpen: true, ConfirmTimeoutMs: 200));
+        Assert.Equal(ControlWriteOutcome.Rejected, fault.Outcome);
+        Assert.Contains("状态故障", fault.Message);
+
+        // 超时：状态未变化 → Unknown（已发送但未确认）。
+        states[5] = (ushort)(1 << 0);
+        harness.Session.Send(EquipmentGroups.PartState);
+        snapshot = harness.Client.Snapshot();
+        var timeout = await harness.Client.WriteControlAsync(new ControlWriteRequest(
+            "Part_Command[13]", true, snapshot.Epoch, "样品挡板", "开启", PermissionKey.SystemStatus,
+            Confirm: ControlConfirm.State, StateAddress: "Part_State[5]", ExpectOpen: true, ConfirmTimeoutMs: 200));
+        Assert.Equal(ControlWriteOutcome.Unknown, timeout.Outcome);
+        Assert.Contains("状态未确认", timeout.Message);
+    }
+
+    [Fact]
+    public async Task Ui_does_not_flip_before_state_feedback_arrives()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+        states[5] = (ushort)(1 << 0); // 关闭
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.False(viewModel.SampleShutterIsOn);
+
+        viewModel.ToggleSampleShutterCommand.Execute(null); // 发送打开命令
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsWriting);
+        // 命令已确认但状态事件尚未推送，界面不得提前变绿。
+        Assert.False(viewModel.SampleShutterIsOn);
+
+        states[5] = (ushort)(1 << 1); // PLC 反馈到位
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.True(viewModel.SampleShutterIsOn);
+    }
+
+    [Fact]
+    public async Task Toggle_emits_single_array_batch_write_and_one_audit()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.ToggleSampleShutterCommand.Execute(null); // 开启：断言13、互斥14
+        await AlarmArrayConnectionTests.Until(() =>
+            harness.Session.ArrayWrites.Any(a => a.Group == EquipmentGroups.PartCommand)
+            && !harness.Client.Snapshot().IsWriting);
+
+        var toggle = Assert.Single(harness.Session.ArrayWrites, a => a.Group == EquipmentGroups.PartCommand);
+        Assert.Equal(false, toggle.Mutations.Single(m => m.Index == 14).Value);
+        Assert.Equal(true, toggle.Mutations.Single(m => m.Index == 13).Value);
+        // 一次点击 = 一次批量数组写入 + 一条审计记录（互斥+断言合并）。
+        Assert.Single(harness.Runtime.All);
+    }
+
+    [Fact]
+    public async Task Interlocked_toggle_with_interlock_false_writes_nothing()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var interlocks = (bool[])harness.Session.Values[EquipmentGroups.Interlock];
+        interlocks[8] = false; // 放气阀打开互锁 EQ_Interlock[8]
+        harness.Session.Send(EquipmentGroups.Interlock);
+
+        viewModel.ToggleLowerForelineValveCommand.Execute(null); // 打开放气阀
+        await AlarmArrayConnectionTests.Until(() => viewModel.ControlStatusText.Contains("互锁"));
+
+        Assert.Empty(harness.Session.ArrayWrites);
+        Assert.Empty(harness.Session.ControlWrites);
+        Assert.Empty(harness.Runtime.All);
     }
 
     private sealed class ControlHarness : IAsyncDisposable

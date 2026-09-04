@@ -51,7 +51,6 @@ public sealed class EquipmentFeatureTests
             [EquipmentGroups.Alarm] = new bool[552], [EquipmentGroups.Io] = new bool[532],
             [EquipmentGroups.Parameter] = Enumerable.Repeat(5f,21).ToArray(),
             [EquipmentGroups.PartCommand] = new bool[1000],
-            [EquipmentGroups.PartCommandEnable] = Enumerable.Repeat(true,1000).ToArray(),
             [EquipmentGroups.PartState] = Enumerable.Repeat((ushort)1,500).ToArray(),
             [EquipmentGroups.PartData] = new float[27],
             [EquipmentGroups.PartDataSet1] = new float[21],
@@ -63,10 +62,12 @@ public sealed class EquipmentFeatureTests
         public readonly Dictionary<string, string> SubscriptionErrors = [];
         public readonly List<(int Index, object Value)> Writes = [];
         public readonly List<(string Group, int? Index, object Value)> ControlWrites = [];
+        public readonly List<(string Group, IReadOnlyList<(int Index, object Value)> Mutations)> ArrayWrites = [];
         public readonly List<string> InitialReads = [];
         public string[] Subscribed = [];
         public int SubscribeCount;
         public bool Disposed;
+        public bool ApplyFeedback = true;
         public Func<int, object, CancellationToken, Task>? WriteHandler;
         public Func<int, CancellationToken, Task<DataValue>>? ElementRead;
         public Action<string, DataValue>? Callback;
@@ -104,8 +105,49 @@ public sealed class EquipmentFeatureTests
             if (Scalars.ContainsKey(group)) Scalars[group] = (bool)value;
             else if (index.HasValue) Values[group].SetValue(value,index.Value);
             else throw new InvalidOperationException("数组控制点缺少下标");
+            ApplyPartCommandFeedback(group, index, value);
             Send(group);
             return Task.CompletedTask;
+        }
+        public Task WriteArrayElementsAsync(string group, IReadOnlyList<ArrayWriteMutation> mutations, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            ArrayWrites.Add((group, mutations.Select(m => (m.Index, m.Value)).ToArray()));
+            foreach (var mutation in mutations)
+            {
+                if (Scalars.ContainsKey(group)) throw new InvalidOperationException("数组组不能作为标量写入");
+                Values[group].SetValue(mutation.Value, mutation.Index);
+                if (group == EquipmentGroups.PartCommand && Equals(mutation.Value, true))
+                    ApplyPartCommandFeedback(group, mutation.Index, mutation.Value);
+            }
+            Send(group);
+            return Task.CompletedTask;
+        }
+        private void ApplyPartCommandFeedback(string group, int? index, object value)
+        {
+            if (!ApplyFeedback) return;
+            if (group != EquipmentGroups.PartCommand || value is not true || index is not { } commandIndex)
+                return;
+            // 模拟 PLC：收到开/关命令后更新对应 Part_State，但不主动推送订阅，UI 变化仍等真实状态反馈。
+            (int Part, bool Open) feedback = commandIndex switch
+            {
+                0 => (0, true), 1 => (0, false), 2 => (1, true), 3 => (1, false),
+                6 => (2, true), 7 => (2, false),
+                8 => (3, true), 9 => (3, false),
+                10 => (4, true), 11 => (4, false), 12 => (4, false),
+                13 => (5, true), 14 => (5, false),
+                15 => (24, true), 16 => (24, false), 17 => (25, true), 18 => (25, false),
+                21 => (6, true), 22 => (6, false), 23 => (7, true), 24 => (7, false),
+                27 => (11, true), 28 => (11, false), 29 => (12, true), 30 => (12, false),
+                31 => (15, true), 32 => (15, false), 33 => (14, true), 34 => (14, false),
+                35 => (13, true), 36 => (13, false), 37 => (16, true), 38 => (16, false),
+                39 => (20, true), 40 => (20, false),
+                41 => (21, true), 42 => (21, false), 43 => (22, true), 44 => (22, false),
+                45 => (23, true), 46 => (23, false), _ => (-1, false)
+            };
+            if (feedback.Part >= 0)
+                Values[EquipmentGroups.PartState].SetValue(
+                    feedback.Open ? (ushort)2 : (ushort)1, feedback.Part);
         }
         public void Send(string group, StatusCode? quality = null) =>
             Callback?.Invoke(group, new DataValue(new Variant(Scalars.TryGetValue(group,out var scalar) ? scalar : Values[group].Clone())) { StatusCode = quality ?? StatusCodes.Good });

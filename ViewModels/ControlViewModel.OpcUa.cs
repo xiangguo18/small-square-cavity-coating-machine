@@ -6,6 +6,7 @@ using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.Equipment;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Security;
+using Small_square_cavity_coating_machine.Services;
 
 namespace Small_square_cavity_coating_machine.ViewModels;
 
@@ -17,9 +18,29 @@ public partial class ControlViewModel : IDisposable
     private string _requestedStageDirection = "Stop";
     private bool _disposed;
 
+    // 左侧系统控制：同组三个命令地址互斥（目标写 1，其余写 0）。
+    private static readonly Dictionary<string, string[]> SystemMutexGroups = new(StringComparer.Ordinal)
+    {
+        ["Start"] = ["Stop", "Reset"],
+        ["Stop"] = ["Start", "Reset"],
+        ["Reset"] = ["Start", "Stop"],
+        ["Auto"] = ["Semi", "Manual"],
+        ["Semi"] = ["Auto", "Manual"],
+        ["Manual"] = ["Auto", "Semi"],
+    };
+
+    // 真空控制：三个流程命令互斥。
+    private static readonly Dictionary<int, int[]> WorkflowMutexGroups = new()
+    {
+        [980] = [981, 982],
+        [981] = [980, 982],
+        [982] = [980, 981],
+    };
+
     public ControlViewModel(IOperationLogRepository operationLogRepository, IAuthorizationService authorization,
-        IEquipmentControlService controlService, IUiDispatcher dispatcher)
-        : this(operationLogRepository, authorization)
+        IEquipmentControlService controlService, IUiDispatcher dispatcher,
+        IConfirmationDialogService? confirmation = null)
+        : this(operationLogRepository, authorization, confirmation)
     {
         _controlService = controlService;
         _dispatcher = dispatcher;
@@ -260,7 +281,9 @@ public partial class ControlViewModel : IDisposable
         var knownFeedback = _controlService.Definitions.Commands.GetValueOrDefault(openId) is { PartId: var partId }
             && _controlService.Definitions.Parts.GetValueOrDefault(partId)?.StateAddress is { Length: > 0 };
         var current = knownFeedback ? feedbackOpen : Requested(key);
-        QueuePartCommand(current ? closeId : openId, target, current ? "关闭" : "开启", key, !current);
+        var assertId = current ? closeId : openId;
+        var deassertId = current ? openId : closeId;
+        QueuePartCommand(assertId, deassertId, target, current ? "关闭" : "开启", key, !current);
         return true;
     }
 
@@ -268,14 +291,12 @@ public partial class ControlViewModel : IDisposable
     {
         if (_controlService is null) return false;
         var service = _controlService;
+        var siblings = WorkflowMutexGroups.TryGetValue(id, out var ids) ? ids : [];
         _ = Task.Run(async () =>
         {
-            var result = await service.ExecutePartCommandAsync(id, "真空流程", action).ConfigureAwait(false);
-            _dispatcher?.Post(() =>
-            {
-                ControlStatusText = result.Message;
-                if (result.Outcome == ControlWriteOutcome.Confirmed) ToggleWorkflowSelection(id);
-            });
+            var result = await service.ExecutePartCommandBatchAsync(id, siblings, "真空流程", action).ConfigureAwait(false);
+            // 抽真空/破真空/保压不再使用本地虚假选中状态；状态由真实反馈驱动。
+            _dispatcher?.Post(() => ControlStatusText = result.Message);
         });
         return true;
     }
@@ -294,12 +315,13 @@ public partial class ControlViewModel : IDisposable
         PressureHoldingIsSelected = !turnOff && id == 982;
     }
 
-    private void QueuePartCommand(int id, string target, string action, string? requestedKey, bool? requestedValue)
+    private void QueuePartCommand(int assertId, int deassertId, string target, string action, string? requestedKey, bool? requestedValue)
     {
         var service = _controlService!;
         _ = Task.Run(async () =>
         {
-            var result = await service.ExecutePartCommandAsync(id, target, action).ConfigureAwait(false);
+            var deasserts = deassertId >= 0 ? new[] { deassertId } : [];
+            var result = await service.ExecutePartCommandBatchAsync(assertId, deasserts, target, action).ConfigureAwait(false);
             _dispatcher?.Post(() =>
             {
                 ControlStatusText = result.Message;
@@ -313,8 +335,11 @@ public partial class ControlViewModel : IDisposable
     {
         if (_controlService is null) return false;
         var service = _controlService;
+        var siblings = SystemMutexGroups.TryGetValue(name, out var names) ? names : [];
         _ = Task.Run(async () =>
         {
+            foreach (var sibling in siblings)
+                await service.WriteSystemCommandAsync(sibling, false, "系统控制", "互斥清除").ConfigureAwait(false);
             var result = await service.ExecuteSystemCommandAsync(name).ConfigureAwait(false);
             _dispatcher?.Post(() => ControlStatusText = result.Message);
         });
@@ -333,15 +358,46 @@ public partial class ControlViewModel : IDisposable
         return true;
     }
 
+    private bool TryQueueApcPosition(double value)
+    {
+        if (_controlService is null) return false;
+        var service = _controlService;
+        // 定位模式下：设定值 0 = 关闭，正数 = 开启，并联动开/关地址对互斥。
+        var opening = value > 0d;
+        var assertId = opening ? 6 : 7;
+        var deassertId = opening ? 7 : 6;
+        var action = opening ? "开启" : "关闭";
+        _ = Task.Run(async () =>
+        {
+            // 一次读整组→互斥置0+断言置1→整组写回；互锁由底层校验，成功后观察 Part_State 反馈。
+            var result = await service.ExecutePartCommandBatchAsync(assertId, [deassertId], "APC阀", action).ConfigureAwait(false);
+            var message = result.Message;
+            // 仅当主命令状态反馈到位时才下发设定值；被互锁/权限/状态未确认则不下发（fail-closed）。
+            if (result.Outcome == ControlWriteOutcome.Confirmed)
+            {
+                var setpoint = await service.WriteSetpointAsync(1, value, PermissionKey.SystemStatus).ConfigureAwait(false);
+                message = setpoint.Message;
+            }
+            _dispatcher?.Post(() => ControlStatusText = message);
+        });
+        return true;
+    }
+
     private bool TryQueueStageDirection(string direction, int commandId)
     {
         if (_controlService is null) return false;
         var nextDirection = _requestedStageDirection == direction ? "Stop" : direction;
         var nextCommand = nextDirection == "Stop" ? 12 : commandId;
+        var deasserts = nextCommand switch
+        {
+            10 => new[] { 11, 12 },
+            11 => new[] { 10, 12 },
+            _ => new[] { 10, 11 },
+        };
         var service = _controlService;
         _ = Task.Run(async () =>
         {
-            var result = await service.ExecutePartCommandAsync(nextCommand, "样品台",
+            var result = await service.ExecutePartCommandBatchAsync(nextCommand, deasserts, "样品台",
                 nextDirection == "Stop" ? "停止" : nextDirection == "Forward" ? "正转" : "反转").ConfigureAwait(false);
             _dispatcher?.Post(() =>
             {

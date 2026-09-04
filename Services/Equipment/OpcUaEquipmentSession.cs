@@ -3,7 +3,6 @@ using Opc.Ua.Client;
 using Small_square_cavity_coating_machine.Models.Equipment;
 using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.Equipment;
-using System.Globalization;
 
 namespace Small_square_cavity_coating_machine.Services.Equipment
 {
@@ -95,10 +94,18 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
             if (!_groupNodes.TryGetValue(group, out var node)) throw new InvalidOperationException($"未绑定{group}");
             var response = await _session.ReadAsync(null, 0, TimestampsToReturn.Both,
                 new ReadValueIdCollection { new ReadValueId {
-                    NodeId = node, AttributeId = Attributes.Value,
-                    IndexRange = index?.ToString(CultureInfo.InvariantCulture)
+                    NodeId = node, AttributeId = Attributes.Value
                 } }, token).ConfigureAwait(false);
-            return response.Results.Single();
+            var data = response.Results.Single();
+            if (index is not { } elementIndex) return data;
+            if (data.Value is not Array { Rank: 1 } array || elementIndex < 0 || elementIndex >= array.Length)
+                throw new InvalidOperationException($"{group}不是可索引的一维数组，或下标{elementIndex}越界");
+            return new DataValue(new Variant(array.GetValue(elementIndex)))
+            {
+                StatusCode = data.StatusCode,
+                SourceTimestamp = data.SourceTimestamp,
+                ServerTimestamp = data.ServerTimestamp
+            };
         }
 
         public async Task<IReadOnlyDictionary<string, string>> SubscribeGroupsAsync(IReadOnlyList<string> groups,
@@ -143,17 +150,64 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
             if (!_groupBindings.TryGetValue(group, out var binding) || !binding.Available || !binding.CanWrite
                 || binding.ElementType != value.GetType() || index < 0 || EquipmentGroups.IsScalar(group) == index.HasValue)
                 throw new ParameterWriteRejectedException($"{group}节点不可写或写入类型不匹配");
-            object payload = value;
             if (index.HasValue)
             {
-                var array = Array.CreateInstance(value.GetType(), 1);
-                array.SetValue(value, 0);
-                payload = array;
+                var current = await ReadGroupAsync(group, null, token).ConfigureAwait(false);
+                if (!StatusCode.IsGood(current.StatusCode) || current.StatusCode.Overflow
+                    || current.Value is not Array { Rank: 1 } currentArray
+                    || index.Value < 0 || index.Value >= currentArray.Length)
+                    throw new ParameterWriteRejectedException($"{group}整组读取失败或下标越界，元素写入未执行");
+                var array = Array.CreateInstance(value.GetType(), currentArray.Length);
+                Array.Copy(currentArray, array, currentArray.Length);
+                array.SetValue(value, index.Value);
+                await WriteArrayPayloadAsync(group, array, token).ConfigureAwait(false);
+                return;
             }
+            await WriteScalarPayloadAsync(group, value, token).ConfigureAwait(false);
+        }
+
+        public async Task WriteArrayElementsAsync(string group, IReadOnlyList<ArrayWriteMutation> mutations, CancellationToken token)
+        {
+            if (mutations is null || mutations.Count == 0)
+                throw new ParameterWriteRejectedException($"{group}无数组元素写入");
+            if (!_groupBindings.TryGetValue(group, out var binding) || !binding.Available || !binding.CanWrite
+                || binding.ElementType is null || EquipmentGroups.IsScalar(group))
+                throw new ParameterWriteRejectedException($"{group}节点不可写或不是数组");
+            var current = await ReadGroupAsync(group, null, token).ConfigureAwait(false);
+            if (!StatusCode.IsGood(current.StatusCode) || current.StatusCode.Overflow
+                || current.Value is not Array { Rank: 1 } currentArray)
+                throw new ParameterWriteRejectedException($"{group}整组读取失败，数组写入未执行");
+            var array = Array.CreateInstance(binding.ElementType, currentArray.Length);
+            Array.Copy(currentArray, array, currentArray.Length);
+            foreach (var mutation in mutations)
+            {
+                if (mutation.Index < 0 || mutation.Index >= array.Length)
+                    throw new ParameterWriteRejectedException($"{group}下标越界：{mutation.Index}");
+                if (mutation.Value.GetType() != binding.ElementType)
+                    throw new ParameterWriteRejectedException($"{group}元素写入类型不匹配：{mutation.Index}");
+                array.SetValue(mutation.Value, mutation.Index);
+            }
+            await WriteArrayPayloadAsync(group, array, token).ConfigureAwait(false);
+        }
+
+        private async Task WriteArrayPayloadAsync(string group, Array payload, CancellationToken token)
+        {
             var response = await _session.WriteAsync(null, new WriteValueCollection {
                 new WriteValue { NodeId = _groupNodes[group], AttributeId = Attributes.Value,
-                    IndexRange = index?.ToString(CultureInfo.InvariantCulture),
+                    IndexRange = null,
                     Value = new DataValue(new Variant(payload)) }
+            }, token).ConfigureAwait(false);
+            var status = response.Results.Single();
+            if (StatusCode.IsBad(status)) throw new ParameterWriteRejectedException($"PLC拒绝{group}写入：{status}");
+            if (!StatusCode.IsGood(status)) throw new InvalidOperationException($"PLC未明确确认写入：{status}");
+        }
+
+        private async Task WriteScalarPayloadAsync(string group, object value, CancellationToken token)
+        {
+            var response = await _session.WriteAsync(null, new WriteValueCollection {
+                new WriteValue { NodeId = _groupNodes[group], AttributeId = Attributes.Value,
+                    IndexRange = null,
+                    Value = new DataValue(new Variant(value)) }
             }, token).ConfigureAwait(false);
             var status = response.Results.Single();
             if (StatusCode.IsBad(status)) throw new ParameterWriteRejectedException($"PLC拒绝{group}写入：{status}");
@@ -170,7 +224,7 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
                 throw new InvalidOperationException("配方写入类型不匹配");
             var response = await _session.WriteAsync(null, new WriteValueCollection {
                 new WriteValue { NodeId = _groupNodes[group], AttributeId = Attributes.Value,
-                    IndexRange = group == EquipmentGroups.Recipe ? "0:17" : null,
+                    IndexRange = null,
                     Value = new DataValue(new Variant(value)) } }, token).ConfigureAwait(false);
             var status = response.Results.Single();
             if (!StatusCode.IsGood(status)) throw new InvalidOperationException($"PLC配方写入未成功：{status}；不降级、不重试");

@@ -128,7 +128,8 @@ public sealed class ApplicationServices : IDisposable
             OperationLogRepository,
             AuthorizationService,
             ControlService,
-            _uiDispatcher);
+            _uiDispatcher,
+            new WpfConfirmationDialogService());
         RecipePlcGateway = new OpcUaRecipePlcGateway(EquipmentClient, runtime, recipeDefinitions,
             definitionErrors.GetValueOrDefault(EquipmentGroups.Recipe, ""));
         var recipeImporter = new ExcelRecipeImporter(recipeDefinitions);

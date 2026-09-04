@@ -47,6 +47,8 @@ public sealed class RecipeProtocolTests
             return await Base.SubscribeGroupsAsync(groups.Where(g => EquipmentGroups.All.Contains(g)).ToArray(), onValue, token);
         }
         public Task WriteParameterElementAsync(int index, object value, CancellationToken token) => Base.WriteParameterElementAsync(index, value, token);
+        public Task WriteArrayElementsAsync(string group, IReadOnlyList<ArrayWriteMutation> mutations, CancellationToken token)
+            => Base.WriteArrayElementsAsync(group, mutations, token);
         public async Task WriteRecipeValueAsync(string group, object value, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();

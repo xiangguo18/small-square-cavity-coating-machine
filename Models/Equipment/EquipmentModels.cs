@@ -20,17 +20,17 @@ public static class EquipmentGroups
     public const string Recipe = "EQ_Recipe1", RecipeOk = "EQ_RecipeOK", CoatOk = "EQ_CoatOK";
     public static readonly string[] SystemControlPoints =
     [
-        "EQ_Manual", "EQ_Manual_En", "fbButtonManual_Output",
-        "EQ_Auto", "EQ_Auto_En", "fbButtonAuto_Output",
-        "EQ_Semi", "EQ_Semi_En", "fbButtonSemi_Output",
-        "EQ_Start", "EQ_Start_En", "fbButtonStart_Output",
-        "EQ_Stop", "EQ_Stop_En", "fbButtonStop_Output",
-        "EQ_Reset", "EQ_Reset_En", "fbButtonReset_Output",
+        "EQ_Manual", "fbButtonManual_Output",
+        "EQ_Auto", "fbButtonAuto_Output",
+        "EQ_Semi", "fbButtonSemi_Output",
+        "EQ_Start", "fbButtonStart_Output",
+        "EQ_Stop", "fbButtonStop_Output",
+        "EQ_Reset", "fbButtonReset_Output",
         PassInterlock
     ];
     public static readonly string[] ControlArrays =
     [
-        PartCommand, PartCommandEnable, PartState, PartData,
+        PartCommand, PartState, PartData,
         PartDataSet1, PartDataSet2, Interlock
     ];
     public static readonly string[] All = [Alarm, Io, Parameter];
@@ -42,7 +42,6 @@ public static class EquipmentGroups
         || group == RecipeOk || group == CoatOk
         || group == PartCommand || group == PartDataSet1 || group == PartDataSet2
         || group == PassInterlock || SystemControlPoints.Contains(group, StringComparer.Ordinal)
-            && !group.EndsWith("_En", StringComparison.Ordinal)
             && !group.StartsWith("fbButton", StringComparison.Ordinal);
 }
 
@@ -77,7 +76,7 @@ public sealed record ParameterCache(string Endpoint, string Address, string Valu
 public sealed record PartDefinition(int Id, string Location, string Name, string StateAddress, string Interlock);
 
 public sealed record PartCommandDefinition(int Id, int PartId, string Command, string DisplayName,
-    string Address, string EnableAddress, string Info, string InterlockAddress);
+    string Address, string Info, string InterlockAddress);
 
 public sealed record PartDataDefinition(int Id, int PartId, string Name, string DisplayName, string Access,
     string Address, string SetAddress, double Minimum, double Maximum, string Unit);
@@ -102,8 +101,23 @@ public sealed record EquipmentControlDefinitions(
 }
 
 public sealed record ControlWriteRequest(string Address, object Value, long Epoch, string Target, string Action,
-    PermissionKey Permission, bool RequiresBuiltInAdministrator = false);
+    PermissionKey Permission, bool RequiresBuiltInAdministrator = false,
+    ControlConfirm Confirm = ControlConfirm.ReadBack,
+    string? StateAddress = null,
+    bool ExpectOpen = false,
+    int ConfirmTimeoutMs = 5000,
+    IReadOnlyList<ArrayWriteMutation>? ArrayMutations = null);
 
 public enum ControlWriteOutcome { Confirmed, Rejected, Unknown }
 
 public sealed record ControlWriteResult(ControlWriteOutcome Outcome, string Message, object? ConfirmedValue = null);
+
+/// <summary>数组组内单次写入的若干元素变化（读整组→改多个元素→一次写回）。</summary>
+public sealed record ArrayWriteMutation(int Index, object Value);
+
+public enum ControlConfirm
+{
+    ReadBack = 0,
+    Sent = 1,
+    State = 2
+}

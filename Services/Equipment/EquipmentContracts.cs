@@ -19,6 +19,7 @@ public interface IEquipmentSession : IAsyncDisposable
         group == EquipmentGroups.Parameter && index.HasValue
             ? WriteParameterElementAsync(index.Value, value, token)
             : throw new NotSupportedException($"此会话未实现{group}写入");
+    Task WriteArrayElementsAsync(string group, IReadOnlyList<ArrayWriteMutation> mutations, CancellationToken token);
     Task WriteRecipeValueAsync(string group, object value, CancellationToken token) => throw new NotSupportedException("此会话未实现配方写入");
     Task WaitForDisconnectAsync(CancellationToken token);
 }
