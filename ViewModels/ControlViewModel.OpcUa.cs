@@ -15,7 +15,6 @@ public partial class ControlViewModel : IDisposable
     private IEquipmentControlService? _controlService;
     private IUiDispatcher? _dispatcher;
     private readonly Dictionary<string, bool> _requestedStates = new(StringComparer.Ordinal);
-    private string _requestedStageDirection = "Stop";
     private bool _disposed;
 
     // 左侧系统控制：同组三个命令地址互斥（目标写 1，其余写 0）。
@@ -152,8 +151,6 @@ public partial class ControlViewModel : IDisposable
         Power1IsFaulted = power1.Fault;
         Power2IsRunning = power2.Open;
         Power2IsFaulted = power2.Fault;
-        SampleStageIsForwardRunning = false;
-        SampleStageIsReverseRunning = false;
         SampleStageIsRunning = sampleStage.Open;
         SampleStageIsFaulted = sampleStage.Fault;
         DryPumpIsRunning = dryPump.Open;
@@ -209,13 +206,6 @@ public partial class ControlViewModel : IDisposable
         Power2MeasuredCurrent = Number(snapshot, "Part_Data1[26]");
         Power2Setpoint = Number(snapshot, "Part_Data_Set2[1]");
 
-        SystemIsRunning = Boolean(snapshot, "fbButtonStart_Output");
-        SystemIsStopped = Boolean(snapshot, "fbButtonStop_Output");
-        SystemResetIsActive = Boolean(snapshot, "fbButtonReset_Output");
-        AutomaticModeIsSelected = Boolean(snapshot, "fbButtonAuto_Output");
-        SemiAutomaticModeIsSelected = Boolean(snapshot, "fbButtonSemi_Output");
-        ManualModeIsSelected = Boolean(snapshot, "fbButtonManual_Output");
-
         ApcInterlockReleased = Boolean(snapshot, ApcIsOpen ? "EQ_Interlock[7]" : "EQ_Interlock[6]");
         BypassValveInterlockReleased = Boolean(snapshot, BypassValveIsOpen ? "EQ_Interlock[1]" : "EQ_Interlock[0]");
         RightForelineValveInterlockReleased = Boolean(snapshot, RightForelineValveIsOpen ? "EQ_Interlock[3]" : "EQ_Interlock[2]");
@@ -226,6 +216,7 @@ public partial class ControlViewModel : IDisposable
 
         var bypass = Boolean(snapshot, EquipmentGroups.PassInterlock);
         ApplicationStatusViewModel.Instance.MaintenanceBypassActive = bypass;
+        if (!snapshot.IsConnected) ResetCommandActiveStates();
         ControlStatusText = snapshot.IsConnected ? "PLC控制点已连接" : "PLC控制点未连接，设备状态不可用";
     }
 
@@ -295,8 +286,14 @@ public partial class ControlViewModel : IDisposable
         _ = Task.Run(async () =>
         {
             var result = await service.ExecutePartCommandBatchAsync(id, siblings, "真空流程", action).ConfigureAwait(false);
-            // 抽真空/破真空/保压不再使用本地虚假选中状态；状态由真实反馈驱动。
-            _dispatcher?.Post(() => ControlStatusText = result.Message);
+            _dispatcher?.Post(() =>
+            {
+                ControlStatusText = result.Message;
+                if (result.Outcome != ControlWriteOutcome.Confirmed) return;
+                VacuumingIsSelected = id == 980;
+                VentingIsSelected = id == 981;
+                PressureHoldingIsSelected = id == 982;
+            });
         });
         return true;
     }
@@ -341,9 +338,76 @@ public partial class ControlViewModel : IDisposable
             foreach (var sibling in siblings)
                 await service.WriteSystemCommandAsync(sibling, false, "系统控制", "互斥清除").ConfigureAwait(false);
             var result = await service.ExecuteSystemCommandAsync(name).ConfigureAwait(false);
-            _dispatcher?.Post(() => ControlStatusText = result.Message);
+            _dispatcher?.Post(() =>
+            {
+                ControlStatusText = result.Message;
+                if (result.Outcome != ControlWriteOutcome.Confirmed) return;
+                ApplySystemCommandSelection(name);
+            });
         });
         return true;
+    }
+
+    /// <summary>按“写入成功→亮灯、同组互斥”刷新命令按钮的本机选中态。</summary>
+    private void ApplySystemCommandSelection(string name)
+    {
+        switch (name)
+        {
+            case "Start":
+                SystemIsRunning = true;
+                SystemIsStopped = false;
+                SystemResetIsActive = false;
+                break;
+            case "Stop":
+                SystemIsRunning = false;
+                SystemIsStopped = true;
+                SystemResetIsActive = false;
+                break;
+            case "Reset":
+                SystemIsRunning = false;
+                SystemIsStopped = false;
+                SystemResetIsActive = true;
+                ClearModeAndWorkflowAndStageSelection();
+                break;
+            case "Auto":
+                AutomaticModeIsSelected = true;
+                SemiAutomaticModeIsSelected = false;
+                ManualModeIsSelected = false;
+                break;
+            case "Semi":
+                AutomaticModeIsSelected = false;
+                SemiAutomaticModeIsSelected = true;
+                ManualModeIsSelected = false;
+                break;
+            case "Manual":
+                AutomaticModeIsSelected = false;
+                SemiAutomaticModeIsSelected = false;
+                ManualModeIsSelected = true;
+                break;
+        }
+    }
+
+    /// <summary>运行模式、真空控制、样品台方向三组的按钮灯全部熄灭（系统复位/断连时使用）。</summary>
+    private void ClearModeAndWorkflowAndStageSelection()
+    {
+        AutomaticModeIsSelected = false;
+        SemiAutomaticModeIsSelected = false;
+        ManualModeIsSelected = false;
+        VacuumingIsSelected = false;
+        VentingIsSelected = false;
+        PressureHoldingIsSelected = false;
+        SampleStageIsForwardRunning = false;
+        SampleStageIsReverseRunning = false;
+        SampleStageIsStopped = false;
+    }
+
+    /// <summary>所有写入成功亮灯按钮（含系统控制组）全部熄灭；断连/重连时 fail-closed。</summary>
+    private void ResetCommandActiveStates()
+    {
+        SystemIsRunning = false;
+        SystemIsStopped = false;
+        SystemResetIsActive = false;
+        ClearModeAndWorkflowAndStageSelection();
     }
 
     private bool TryQueueSetpoint(int dataId, double value)
@@ -386,23 +450,25 @@ public partial class ControlViewModel : IDisposable
     private bool TryQueueStageDirection(string direction, int commandId)
     {
         if (_controlService is null) return false;
-        var nextDirection = _requestedStageDirection == direction ? "Stop" : direction;
-        var nextCommand = nextDirection == "Stop" ? 12 : commandId;
-        var deasserts = nextCommand switch
+        var deasserts = commandId switch
         {
             10 => new[] { 11, 12 },
             11 => new[] { 10, 12 },
+            12 => new[] { 10, 11 },
             _ => new[] { 10, 11 },
         };
         var service = _controlService;
         _ = Task.Run(async () =>
         {
-            var result = await service.ExecutePartCommandBatchAsync(nextCommand, deasserts, "样品台",
-                nextDirection == "Stop" ? "停止" : nextDirection == "Forward" ? "正转" : "反转").ConfigureAwait(false);
+            var result = await service.ExecutePartCommandBatchAsync(commandId, deasserts, "样品台",
+                direction == "Stop" ? "停止" : direction == "Forward" ? "正转" : "反转").ConfigureAwait(false);
             _dispatcher?.Post(() =>
             {
                 ControlStatusText = result.Message;
-                if (result.Outcome == ControlWriteOutcome.Confirmed) _requestedStageDirection = nextDirection;
+                if (result.Outcome != ControlWriteOutcome.Confirmed) return;
+                SampleStageIsForwardRunning = direction == "Forward";
+                SampleStageIsReverseRunning = direction == "Reverse";
+                SampleStageIsStopped = direction == "Stop";
             });
         });
         return true;

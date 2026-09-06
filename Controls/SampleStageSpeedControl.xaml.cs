@@ -80,6 +80,20 @@ public partial class SampleStageSpeedControl : UserControl
             typeof(SampleStageSpeedControl),
             new FrameworkPropertyMetadata(null));
 
+    public static readonly DependencyProperty StopCommandProperty =
+        DependencyProperty.Register(
+            nameof(StopCommand),
+            typeof(ICommand),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(null));
+
+    public static readonly DependencyProperty IsStoppedProperty =
+        DependencyProperty.Register(
+            nameof(IsStopped),
+            typeof(bool),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(false));
+
     public static readonly DependencyProperty ShowDirectionControlsProperty =
         DependencyProperty.Register(
             nameof(ShowDirectionControls),
@@ -160,6 +174,18 @@ public partial class SampleStageSpeedControl : UserControl
     {
         get => (ICommand?)GetValue(ReverseCommandProperty);
         set => SetValue(ReverseCommandProperty, value);
+    }
+
+    public ICommand? StopCommand
+    {
+        get => (ICommand?)GetValue(StopCommandProperty);
+        set => SetValue(StopCommandProperty, value);
+    }
+
+    public bool IsStopped
+    {
+        get => (bool)GetValue(IsStoppedProperty);
+        set => SetValue(IsStoppedProperty, value);
     }
 
     public bool ShowDirectionControls

@@ -249,25 +249,21 @@ public sealed class ControlBindingFeatureTests
     }
 
     [Fact]
-    public async Task Workflow_buttons_send_mutually_exclusive_commands_without_local_selection()
+    public async Task Workflow_buttons_light_on_confirm_with_mutually_exclusive_selection()
     {
         await using var harness = await ControlHarness.CreateAsync();
         using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
             new AlarmFeatureTests.InlineDispatcher());
 
         viewModel.StartVacuumCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() =>
-            harness.Session.ArrayWrites.Any(a => a.Group == EquipmentGroups.PartCommand
-                && a.Mutations.Any(m => m.Index == 980 && Equals(m.Value, true)))
-            && !harness.Client.Snapshot().IsWriting);
-        Assert.False(viewModel.VacuumingIsSelected); // 不再使用本地虚假选中状态
+        await AlarmArrayConnectionTests.Until(() => viewModel.VacuumingIsSelected);
+        Assert.False(viewModel.VentingIsSelected);
+        Assert.False(viewModel.PressureHoldingIsSelected);
 
         viewModel.BreakVacuumCommand.Execute(null);
-        await AlarmArrayConnectionTests.Until(() =>
-            harness.Session.ArrayWrites.Any(a => a.Group == EquipmentGroups.PartCommand
-                && a.Mutations.Any(m => m.Index == 981 && Equals(m.Value, true)))
-            && !harness.Client.Snapshot().IsWriting);
-        Assert.False(viewModel.VentingIsSelected);
+        await AlarmArrayConnectionTests.Until(() => viewModel.VentingIsSelected);
+        Assert.False(viewModel.VacuumingIsSelected);
+        Assert.False(viewModel.PressureHoldingIsSelected);
 
         // 流程命令无独立状态反馈，只报告“命令已发送”，并保持同组互斥（目标写 1、其余写 0）。
         var workflow = harness.Session.ArrayWrites
@@ -278,6 +274,115 @@ public sealed class ControlBindingFeatureTests
         Assert.Contains(workflow, m => m.Index == 981 && Equals(m.Value, true));
         Assert.Contains(workflow, m => m.Index == 981 && Equals(m.Value, false));
         Assert.Contains(workflow, m => m.Index == 982 && Equals(m.Value, false));
+    }
+
+    [Fact]
+    public async Task System_control_buttons_light_on_confirm_with_mutual_exclusion()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.StartSystemCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SystemIsRunning);
+        Assert.False(viewModel.SystemIsStopped);
+        Assert.False(viewModel.SystemResetIsActive);
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Start" && Equals(w.Value, true));
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Stop" && Equals(w.Value, false));
+
+        viewModel.StopSystemCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SystemIsStopped);
+        Assert.False(viewModel.SystemIsRunning);
+        Assert.False(viewModel.SystemResetIsActive);
+
+        // 复位：点亮复位灯，并清空运行模式/真空控制/样品台全部按钮灯。
+        viewModel.SelectManualModeCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ManualModeIsSelected);
+        viewModel.ResetSystemCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SystemResetIsActive);
+        Assert.False(viewModel.SystemIsRunning);
+        Assert.False(viewModel.SystemIsStopped);
+        Assert.False(viewModel.AutomaticModeIsSelected);
+        Assert.False(viewModel.SemiAutomaticModeIsSelected);
+        Assert.False(viewModel.ManualModeIsSelected);
+        Assert.False(viewModel.VacuumingIsSelected);
+        Assert.False(viewModel.VentingIsSelected);
+        Assert.False(viewModel.PressureHoldingIsSelected);
+        Assert.False(viewModel.SampleStageIsForwardRunning);
+        Assert.False(viewModel.SampleStageIsReverseRunning);
+        Assert.False(viewModel.SampleStageIsStopped);
+    }
+
+    [Fact]
+    public async Task Mode_buttons_light_on_confirm_with_mutual_exclusion()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.SelectManualModeCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ManualModeIsSelected);
+        Assert.False(viewModel.AutomaticModeIsSelected);
+        Assert.False(viewModel.SemiAutomaticModeIsSelected);
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Manual" && Equals(w.Value, true));
+        Assert.Contains(harness.Session.ControlWrites, w => w.Group == "EQ_Auto" && Equals(w.Value, false));
+
+        viewModel.SelectSemiAutomaticModeCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SemiAutomaticModeIsSelected);
+        Assert.False(viewModel.ManualModeIsSelected);
+        Assert.False(viewModel.AutomaticModeIsSelected);
+    }
+
+    [Fact]
+    public async Task Sample_stage_direction_buttons_light_on_confirm_with_mutual_exclusion()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.StartSampleStageForwardCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SampleStageIsForwardRunning);
+        Assert.False(viewModel.SampleStageIsReverseRunning);
+        Assert.False(viewModel.SampleStageIsStopped);
+        Assert.False(viewModel.SampleStageIsRunning); // 物理运行灯仍由 Part_State[4] 反馈驱动，本轮未推送反馈
+
+        viewModel.StopSampleStageCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SampleStageIsStopped);
+        Assert.False(viewModel.SampleStageIsForwardRunning);
+        Assert.False(viewModel.SampleStageIsReverseRunning);
+
+        var stage = harness.Session.ArrayWrites
+            .Where(a => a.Group == EquipmentGroups.PartCommand)
+            .SelectMany(a => a.Mutations).Where(m => m.Index is 10 or 11 or 12).ToArray();
+        Assert.Contains(stage, m => m.Index == 10 && Equals(m.Value, true));
+        Assert.Contains(stage, m => m.Index == 10 && Equals(m.Value, false));
+        Assert.Contains(stage, m => m.Index == 12 && Equals(m.Value, true));
+        Assert.Contains(stage, m => m.Index == 11 && Equals(m.Value, false));
+    }
+
+    [Fact]
+    public async Task Disconnect_clears_command_selection_lights_fail_closed()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+
+        viewModel.StartSystemCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SystemIsRunning);
+        viewModel.SelectManualModeCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.ManualModeIsSelected);
+        viewModel.StartSampleStageForwardCommand.Execute(null);
+        await AlarmArrayConnectionTests.Until(() => viewModel.SampleStageIsForwardRunning);
+
+        harness.Session.Failure.TrySetException(new InvalidOperationException("connection lost"));
+        await AlarmArrayConnectionTests.Until(() => !harness.Client.Snapshot().IsConnected);
+        await AlarmArrayConnectionTests.Until(() => !viewModel.SystemIsRunning);
+        Assert.False(viewModel.SystemIsRunning);
+        Assert.False(viewModel.SystemIsStopped);
+        Assert.False(viewModel.SystemResetIsActive);
+        Assert.False(viewModel.AutomaticModeIsSelected);
+        Assert.False(viewModel.ManualModeIsSelected);
+        Assert.False(viewModel.SampleStageIsForwardRunning);
     }
 
     [Fact]

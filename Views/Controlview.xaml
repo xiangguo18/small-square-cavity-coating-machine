@@ -720,13 +720,15 @@
                                     SetpointSpeed="{Binding SampleStageSetpointSpeed}"
                                     IsForwardRunning="{Binding SampleStageIsForwardRunning}"
                                     IsReverseRunning="{Binding SampleStageIsReverseRunning}"
+                                    IsStopped="{Binding SampleStageIsStopped}"
                                     ShowStatusIndicator="True"
                                     IsRunning="{Binding SampleStageIsRunning}"
                                     IsFaulted="{Binding SampleStageIsFaulted}"
                                     Unit="rpm"
                                     SetpointCommand="{Binding SetSampleStageSpeedCommand}"
                                     ForwardCommand="{Binding StartSampleStageForwardCommand}"
-                                    ReverseCommand="{Binding StartSampleStageReverseCommand}" Margin="0,-19,0,-9"
+                                    ReverseCommand="{Binding StartSampleStageReverseCommand}"
+                                    StopCommand="{Binding StopSampleStageCommand}" Margin="0,-19,0,-9"
                                     ToolTip="样品台电机状态：Part_State[4]；正反方向无独立反馈"/>
                                     </Grid>
                                 </Grid>

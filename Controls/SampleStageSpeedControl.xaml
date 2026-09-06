@@ -12,7 +12,7 @@
     <UserControl.Resources>
         <Style x:Key="RotationButtonStyle"
                TargetType="{x:Type Button}">
-            <Setter Property="Width" Value="120"/>
+            <Setter Property="Width" Value="100"/>
             <Setter Property="Height" Value="40"/>
             <Setter Property="Margin" Value="7,2"/>
             <Setter Property="Background" Value="#E7EDF2"/>
@@ -169,6 +169,10 @@
                         Style="{StaticResource RotationButtonStyle}"
                         Tag="{Binding IsReverseRunning, ElementName=Root}"
                         Command="{Binding ReverseCommand, ElementName=Root}"/>
+                <Button Content="停止"
+                        Style="{StaticResource RotationButtonStyle}"
+                        Tag="{Binding IsStopped, ElementName=Root}"
+                        Command="{Binding StopCommand, ElementName=Root}"/>
             </StackPanel>
         </Grid>
     </Border>

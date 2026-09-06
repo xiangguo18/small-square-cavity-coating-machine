@@ -197,6 +197,9 @@ public partial class ControlViewModel : ObservableObject
     private bool sampleStageIsReverseRunning;
 
     [ObservableProperty]
+    private bool sampleStageIsStopped;
+
+    [ObservableProperty]
     private bool sampleStageIsRunning;
 
     [ObservableProperty]
@@ -206,7 +209,7 @@ public partial class ControlViewModel : ObservableObject
     private bool systemIsRunning;
 
     [ObservableProperty]
-    private bool systemIsStopped = true;
+    private bool systemIsStopped;
 
     [ObservableProperty]
     private bool systemResetIsActive;
@@ -218,7 +221,7 @@ public partial class ControlViewModel : ObservableObject
     private bool semiAutomaticModeIsSelected;
 
     [ObservableProperty]
-    private bool manualModeIsSelected = true;
+    private bool manualModeIsSelected;
 
     [ObservableProperty]
     private bool vacuumingIsSelected;
@@ -472,6 +475,7 @@ public partial class ControlViewModel : ObservableObject
         if (TryQueueStageDirection("Forward", 10)) return;
         SampleStageIsForwardRunning = true;
         SampleStageIsReverseRunning = false;
+        SampleStageIsStopped = false;
         LogOperation("样品台", "启动正转", $"{SampleStageSetpointSpeed:0.###} rpm");
     }
 
@@ -482,7 +486,19 @@ public partial class ControlViewModel : ObservableObject
         if (TryQueueStageDirection("Reverse", 11)) return;
         SampleStageIsForwardRunning = false;
         SampleStageIsReverseRunning = true;
+        SampleStageIsStopped = false;
         LogOperation("样品台", "启动反转", $"{SampleStageSetpointSpeed:0.###} rpm");
+    }
+
+    [RelayCommand]
+    private void StopSampleStage()
+    {
+        if (!EnsureCanOperate()) return;
+        if (TryQueueStageDirection("Stop", 12)) return;
+        SampleStageIsForwardRunning = false;
+        SampleStageIsReverseRunning = false;
+        SampleStageIsStopped = true;
+        LogOperation("样品台", "停止");
     }
 
     [RelayCommand]
@@ -492,6 +508,7 @@ public partial class ControlViewModel : ObservableObject
         if (TryQueueSystemCommand("Start")) return;
         SystemIsRunning = true;
         SystemIsStopped = false;
+        SystemResetIsActive = false;
         LogOperation("系统控制", "开启");
     }
 
@@ -502,6 +519,7 @@ public partial class ControlViewModel : ObservableObject
         if (TryQueueSystemCommand("Stop")) return;
         SystemIsRunning = false;
         SystemIsStopped = true;
+        SystemResetIsActive = false;
         LogOperation("系统控制", "停止");
     }
 
@@ -511,15 +529,9 @@ public partial class ControlViewModel : ObservableObject
         if (!EnsureCanOperate()) return;
         if (TryQueueSystemCommand("Reset")) return;
         SystemIsRunning = false;
-        SystemIsStopped = true;
-        AutomaticModeIsSelected = false;
-        SemiAutomaticModeIsSelected = false;
-        ManualModeIsSelected = true;
-        VacuumingIsSelected = false;
-        VentingIsSelected = false;
-        PressureHoldingIsSelected = false;
-        SampleStageIsForwardRunning = false;
-        SampleStageIsReverseRunning = false;
+        SystemIsStopped = false;
+        SystemResetIsActive = true;
+        ClearModeAndWorkflowAndStageSelection();
         LogOperation("系统控制", "复位");
     }
 
@@ -771,6 +783,7 @@ public partial class ControlViewModel : ObservableObject
         SetSampleStageSpeedCommand.NotifyCanExecuteChanged();
         StartSampleStageForwardCommand.NotifyCanExecuteChanged();
         StartSampleStageReverseCommand.NotifyCanExecuteChanged();
+        StopSampleStageCommand.NotifyCanExecuteChanged();
         StartSystemCommand.NotifyCanExecuteChanged();
         StopSystemCommand.NotifyCanExecuteChanged();
         ResetSystemCommand.NotifyCanExecuteChanged();
