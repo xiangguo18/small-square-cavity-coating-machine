@@ -10,13 +10,9 @@
              d:DesignHeight="88"
              MinWidth="80"
              MinHeight="40">
-    <UserControl.Resources>
-        <controls:NumericValueWithUnitConverter x:Key="NumericValueConverter"/>
-    </UserControl.Resources>
-
     <Viewbox Stretch="Uniform">
-        <!-- 根据符号和文本框的实际组合尺寸，完整缩放到控件的 Width/Height 内。 -->
-        <Grid x:Name="LayoutRoot">
+        <!-- 兼容原公开接口；读数面板与设备符号已拆为可独立复用的控件。 -->
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -28,120 +24,31 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!--
-                SymbolRotation 只作用于圆圈和连接杆。
-                使用以圆心为中心的 88×88 正方形区域，旋转到任意方向都不会改变符号占位。
-            -->
-            <Button x:Name="GaugeSymbolButton"
-                    Grid.Row="1"
-                    Grid.Column="1"
-                    Width="88"
-                    Height="88"
-                    Padding="0"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    Focusable="{Binding CanToggle, ElementName=Root}"
-                    IsHitTestVisible="{Binding CanToggle, ElementName=Root}"
-                    Command="{Binding ToggleCommand, ElementName=Root}">
-                <Button.Style>
-                    <Style TargetType="{x:Type Button}">
-                        <Setter Property="Cursor" Value="Arrow"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding CanToggle, ElementName=Root}"
-                                         Value="True">
-                                <Setter Property="Cursor" Value="Hand"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <Button.Template>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Grid>
-                            <Canvas Width="88"
-                                    Height="88">
-                                <Canvas.RenderTransform>
-                                    <RotateTransform Angle="{Binding SymbolRotation, ElementName=Root}"
-                                                     CenterX="44"
-                                                     CenterY="44"/>
-                                </Canvas.RenderTransform>
-                                <Line X1="44" Y1="76" X2="44" Y2="88"
-                                      Stroke="#263238"
-                                      StrokeThickness="4"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"/>
-                                <Ellipse x:Name="GaugeBody"
-                                         Canvas.Left="10"
-                                         Canvas.Top="10"
-                                         Width="68"
-                                         Height="68"
-                                         Fill="#AEB8BF"
-                                         Stroke="#263238"
-                                         StrokeThickness="3"/>
-                            </Canvas>
+            <controls:VacuumGaugeSymbolControl Grid.Row="1"
+                                               Grid.Column="1"
+                                               Width="88"
+                                               Height="88"
+                                               SymbolRotation="{Binding SymbolRotation, ElementName=Root}"
+                                               IsReadingEnabled="{Binding IsReadingEnabled, ElementName=Root}"
+                                               IsFaulted="{Binding IsFaulted, ElementName=Root}"
+                                               ShowValveStatus="{Binding ShowValveStatus, ElementName=Root}"
+                                               IsValveOpen="{Binding IsValveOpen, ElementName=Root}"
+                                               IsValveFaulted="{Binding IsValveFaulted, ElementName=Root}"
+                                               CanToggle="{Binding CanToggle, ElementName=Root}"
+                                               ToggleCommand="{Binding ToggleCommand, ElementName=Root}"/>
 
-                            <!-- 高真空计内部符号始终保持正向，不跟随圆圈和连接杆旋转。 -->
-                            <Path Data="M 21,25 L 44,65 L 67,25 M 16,45 L 72,45"
-                                  Fill="Transparent"
-                                  Stroke="#263238"
-                                  StrokeThickness="4"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  StrokeLineJoin="Round"/>
-                            <Border x:Name="ValveStatusBadge"
-                                    Width="24" Height="24"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Top"
-                                    Background="#AEB8BF"
-                                    BorderBrush="#263238"
-                                    BorderThickness="2"
-                                    CornerRadius="12">
-                                <TextBlock Text="阀" FontSize="12" FontWeight="Bold"
-                                           Foreground="White" TextAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
-                                         Value="True">
-                                <Setter TargetName="GaugeBody"
-                                        Property="Fill"
-                                        Value="#55C878"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding ShowValveStatus, ElementName=Root}" Value="False">
-                                <Setter TargetName="ValveStatusBadge" Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsValveOpen, ElementName=Root}" Value="True">
-                                <Setter TargetName="ValveStatusBadge" Property="Background" Value="#55C878"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsValveFaulted, ElementName=Root}" Value="True">
-                                <Setter TargetName="ValveStatusBadge" Property="Background" Value="#EF4444"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsFaulted, ElementName=Root}" Value="True">
-                                <Setter TargetName="GaugeBody" Property="Fill" Value="#EF4444"/>
-                            </DataTrigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.86"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Opacity" Value="0.72"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-            </Button>
-
-            <!-- 名称和真空度文本框可通过 ReadoutWidth、ReadoutHeight 独立调整。 -->
-            <Border x:Name="GaugeReadout"
-                    Width="{Binding ReadoutWidth, ElementName=Root}"
-                    Height="{Binding ReadoutHeight, ElementName=Root}"
-                    BorderBrush="#263238"
-                    BorderThickness="2"
-                    CornerRadius="3"
-                    Background="#102535"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <Border.Style>
-                    <Style TargetType="{x:Type Border}">
+            <controls:VacuumGaugeReadoutControl x:Name="GaugeReadout"
+                                                Width="{Binding ReadoutWidth, ElementName=Root}"
+                                                Height="{Binding ReadoutHeight, ElementName=Root}"
+                                                DisplayName="{Binding DisplayName, ElementName=Root}"
+                                                VacuumValue="{Binding VacuumValue, ElementName=Root}"
+                                                IsReadingEnabled="{Binding IsReadingEnabled, ElementName=Root}"
+                                                Unit="{Binding Unit, ElementName=Root}"
+                                                ValueFormat="{Binding ValueFormat, ElementName=Root}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                <controls:VacuumGaugeReadoutControl.Style>
+                    <Style TargetType="{x:Type controls:VacuumGaugeReadoutControl}">
                         <Setter Property="Grid.Row" Value="1"/>
                         <Setter Property="Grid.Column" Value="2"/>
                         <Setter Property="Margin" Value="4,0,0,0"/>
@@ -166,75 +73,8 @@
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </Border.Style>
-                <!--
-                    文本使用独立的设计基准进行缩放。
-                    ReadoutWidth/ReadoutHeight 改变时只缩放文本框及其文字，不影响圆形符号。
-                -->
-                <Viewbox Stretch="Uniform"
-                         StretchDirection="Both">
-                    <Grid Width="200"
-                          Height="64">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="28"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="{Binding DisplayName, ElementName=Root}"
-                                   Foreground="#DCEBFA"
-                                   FontSize="20"
-                                   Margin="9,3,9,0"
-                                   TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="LiveReading"
-                                   Grid.Row="1"
-                                   Foreground="#51C8FF"
-                                   FontSize="23"
-                                   FontWeight="Bold"
-                                   Margin="9,0,9,4"
-                                   TextAlignment="Right"
-                                   VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
-                                                     Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                            <TextBlock.Text>
-                                <MultiBinding Converter="{StaticResource NumericValueConverter}">
-                                    <Binding Path="VacuumValue" ElementName="Root"/>
-                                    <Binding Path="ValueFormat" ElementName="Root"/>
-                                    <Binding Path="Unit" ElementName="Root"/>
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                        <TextBlock Grid.Row="1"
-                                   Foreground="#AEB8BF"
-                                   FontSize="23"
-                                   FontWeight="Bold"
-                                   Margin="9,0,9,4"
-                                   TextAlignment="Right"
-                                   VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsReadingEnabled, ElementName=Root}"
-                                                     Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                            <Run Text="-- "/>
-                            <Run Text="{Binding Unit, ElementName=Root}"/>
-                        </TextBlock>
-                    </Grid>
-                </Viewbox>
-            </Border>
+                </controls:VacuumGaugeReadoutControl.Style>
+            </controls:VacuumGaugeReadoutControl>
         </Grid>
     </Viewbox>
 </UserControl>

@@ -122,6 +122,9 @@ public sealed class RecipeProtocolTests
             new RecipeLayer { Sequence = 5, CathodeAPower = 321 });
         Assert.True(result.IsCompleted, result.FailureReason);
         Assert.Equal(2, result.CompletedLayers);
+        Assert.Contains("PLC实际数组长度=24", result.Notice);
+        Assert.Contains("配方覆盖项数=18", result.Notice);
+        Assert.Contains("最终发送载荷长度=24", result.Notice);
         Assert.Equal(new[] { EquipmentGroups.CoatOk, EquipmentGroups.Recipe, EquipmentGroups.RecipeOk,
             EquipmentGroups.Recipe, EquipmentGroups.RecipeOk, EquipmentGroups.CoatOk }, h.Session.Writes.Select(w => w.Group));
         Assert.False((bool)h.Session.Writes.First().Value); Assert.True((bool)h.Session.Writes.Last().Value);
@@ -130,7 +133,7 @@ public sealed class RecipeProtocolTests
         Assert.Equal(1, h.Session.Base.SubscribeCount);
         Assert.Empty(h.Session.Base.Writes); // IO and parameter nodes not used by recipe protocol.
         var records = h.Definitions.Runtime.All;
-        Assert.All(records, a => { Assert.True(a.IsSimulated); Assert.Equal("测试工程师", a.UserName); });
+        Assert.All(records, a => Assert.Equal("测试工程师", a.UserName));
         Assert.Single(records, a => a.RecipeSnapshot.Length > 0);
         Assert.Single(records.Select(a => a.RecipeRunId).Distinct());
         var restarted = new EquipmentRuntimeRepository(System.IO.Path.Combine(h.Definitions.Temp.Path, "equipment-runtime.db"));
@@ -217,6 +220,26 @@ public sealed class RecipeProtocolTests
         Assert.IsType<int>(h.Session.Writes.Single(w => w.Group == EquipmentGroups.RecipeOk).Value);
         Assert.All(h.Session.Writes.Where(w => w.Group == EquipmentGroups.CoatOk), w => Assert.IsType<short>(w.Value));
     }
+    [Fact] public async Task Exact_eighteen_float_recipe_reports_matching_payload_length()
+    {
+        await using var h = new Harness(new Session { Recipe = new float[18], RecipeOk = false, CoatOk = false });
+        await h.Start();
+        var result = await h.Run(new RecipeLayer { Sequence = 1, CathodeAPower = 230 });
+        Assert.True(result.IsCompleted, result.FailureReason);
+        Assert.Contains("PLC实际数组长度=18", result.Notice);
+        Assert.Contains("最终发送载荷长度=18", result.Notice);
+        Assert.IsType<float[]>(h.Session.Writes.Single(w => w.Group == EquipmentGroups.Recipe).Value);
+    }
+
+    [Fact] public async Task Recipe_array_shorter_than_eighteen_is_rejected_before_any_write()
+    {
+        await using var h = new Harness(new Session { Recipe = new float[17] });
+        await h.Start();
+        var result = await h.Run(new RecipeLayer { Sequence = 1 });
+        Assert.False(result.IsCompleted);
+        Assert.Empty(h.Session.Writes);
+        Assert.Contains("未就绪", result.FailureReason);
+    }
     [Fact] public async Task Final_local_save_failure_preserves_PLC_confirmed_success()
     {
         await using var h = new Harness(); await h.Start();
@@ -277,7 +300,7 @@ public sealed class RecipeProtocolTests
         var runtime = new EquipmentRuntimeRepository(file);
         var id = Guid.NewGuid();
         runtime.BeginWrite(new Small_square_cavity_coating_machine.Models.History.OperationLogRecord(DateTimeOffset.Now,
-            "user","recipe","run","1,3",false,false,"",true) { Outcome = "配方运行中", RecipeRunId = id, RecipeSnapshot = "{\"layers\":[1,3]}" });
+            "user","recipe","run",false,false,"") { Outcome = "配方运行中", RecipeRunId = id, RecipeSnapshot = "{\"layers\":[1,3]}" });
         var restored = Assert.Single(new EquipmentRuntimeRepository(file).Query(DateTimeOffset.MinValue,DateTimeOffset.MaxValue));
         Assert.Equal(id,restored.RecipeRunId); Assert.Equal("结果未确认",restored.Outcome); Assert.Contains("需人工核对",restored.FailureReason);
         Assert.Contains("layers",restored.RecipeSnapshot);

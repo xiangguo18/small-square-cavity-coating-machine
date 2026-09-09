@@ -454,17 +454,16 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleFilmGauge()
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueuePartToggle("FilmGaugeValve", FilmGaugeValveIsOpen, 39, 40, "薄膜真空度计阀")) return;
-        FilmGaugeIsReadingEnabled = !FilmGaugeIsReadingEnabled;
-        LogOperation("薄膜高真空度计", FilmGaugeIsReadingEnabled ? "启用读数" : "停止读数");
+        if (TryQueuePartToggle("FilmGaugeValve", FilmGaugeValveIsOpen, 39, 40, "CG前级阀")) return;
+        LogOperation("CG前级阀", FilmGaugeValveIsOpen ? "关闭" : "开启");
     }
 
     [RelayCommand]
     private void SetSampleStageSpeed(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(3, value)) return;
         SampleStageSetpointSpeed = value;
+        if (TryQueueSetpoint(3, value)) { LogOperation("样品台", "设置转速", $"{value:0.###} rpm"); return; }
         LogOperation("样品台", "设置转速", $"{value:0.###} rpm");
     }
 
@@ -630,8 +629,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetArgonFlow(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(7, value)) return;
         ArgonSetpointFlow = value;
+        if (TryQueueSetpoint(7, value)) { LogOperation("Ar MFC", "设置流量", $"{value:0.###} sccm"); return; }
         LogOperation("Ar MFC", "设置流量", $"{value:0.###} sccm");
     }
 
@@ -639,8 +638,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetNitrogenFlow(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(8, value)) return;
         NitrogenSetpointFlow = value;
+        if (TryQueueSetpoint(8, value)) { LogOperation("N₂ MFC", "设置流量", $"{value:0.###} sccm"); return; }
         LogOperation("N₂ MFC", "设置流量", $"{value:0.###} sccm");
     }
 
@@ -648,8 +647,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetOxygenFlow(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(9, value)) return;
         OxygenSetpointFlow = value;
+        if (TryQueueSetpoint(9, value)) { LogOperation("O₂ MFC", "设置流量", $"{value:0.###} sccm"); return; }
         LogOperation("O₂ MFC", "设置流量", $"{value:0.###} sccm");
     }
 
@@ -666,8 +665,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetHeaterTemperature(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(2, value)) return;
         HeaterSetpointTemperature = value;
+        if (TryQueueSetpoint(2, value)) { LogOperation("加热", "设置目标温度", $"{value:0.###} ℃"); return; }
         LogOperation("加热", "设置目标温度", $"{value:0.###} ℃");
     }
 
@@ -684,8 +683,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetPower1(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(21, value)) return;
         Power1Setpoint = value;
+        if (TryQueueSetpoint(21, value)) { LogOperation("电源1", "设置功率", $"{value:0.###} W"); return; }
         LogOperation("电源1", "设置功率", $"{value:0.###} W");
     }
 
@@ -702,8 +701,8 @@ public partial class ControlViewModel : ObservableObject
     private void SetPower2(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueueSetpoint(24, value)) return;
         Power2Setpoint = value;
+        if (TryQueueSetpoint(24, value)) { LogOperation("电源2", "设置功率", $"{value:0.###} W"); return; }
         LogOperation("电源2", "设置功率", $"{value:0.###} W");
     }
 
@@ -725,11 +724,20 @@ public partial class ControlViewModel : ObservableObject
             ControlStatusText = "APC开度范围：0～100 %";
             return;
         }
-        var action = value == 0d ? "关闭" : "开启";
-        if (!ConfirmAction("APC阀设定确认", $"确定将 APC 开度设为 {value:0.###}%（{action}）？")) return;
-        if (TryQueueApcPosition(value)) return;
         ApcPositionSetpoint = value;
+        if (TryQueueSetpoint(1, value)) { LogOperation("APC阀", "设置位置", $"{value:0.###} %"); return; }
         LogOperation("APC阀", "设置位置", $"{value:0.###} %");
+    }
+
+    [RelayCommand]
+    private void ToggleApcValve()
+    {
+        if (!EnsureCanOperate()) return;
+        var action = ApcIsOpen ? "关闭" : "开启";
+        if (!ConfirmAction("APC阀操作确认", $"确定{action}APC阀？")) return;
+        if (TryQueuePartToggle("Apc", ApcIsOpen, 6, 7, "APC阀")) return;
+        ApcIsOpen = !ApcIsOpen;
+        LogOperation("APC阀", action);
     }
 
     [RelayCommand]
@@ -748,11 +756,9 @@ public partial class ControlViewModel : ObservableObject
             _authorization?.CurrentUserName ?? "本地模拟用户",
             target,
             action,
-            setValue,
             true,
             false,
-            string.Empty,
-            true));
+            string.Empty));
     }
 
     private bool EnsureCanOperate() =>
@@ -804,6 +810,7 @@ public partial class ControlViewModel : ObservableObject
         SetPower2Command.NotifyCanExecuteChanged();
         ToggleApcModeCommand.NotifyCanExecuteChanged();
         SetApcPositionCommand.NotifyCanExecuteChanged();
+        ToggleApcValveCommand.NotifyCanExecuteChanged();
         SetApcPressureCommand.NotifyCanExecuteChanged();
     }
 }

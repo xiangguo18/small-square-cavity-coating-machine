@@ -46,14 +46,9 @@
                 <DataGridTextColumn Width="100" Header="用户" Binding="{Binding UserName}"/>
                 <DataGridTextColumn Width="130" Header="设备/对象" Binding="{Binding Target}"/>
                 <DataGridTextColumn Width="*" MinWidth="180" Header="操作内容" Binding="{Binding Action}"/>
-                <DataGridTextColumn Width="100" Header="原值" Binding="{Binding PreviousValue}"/>
-                <DataGridTextColumn Width="110" Header="设定值" Binding="{Binding SetValue}"/>
                 <DataGridTextColumn Width="130" Header="结果" Binding="{Binding ResultText}"/>
                 <DataGridTextColumn Width="75" Header="报警" Binding="{Binding AlarmText}"/>
                 <DataGridTextColumn Width="160" Header="说明" Binding="{Binding FailureReason}"/>
-                <DataGridTextColumn Width="200" Header="Endpoint" Binding="{Binding Endpoint}"/>
-                <DataGridTextColumn Width="160" Header="地址" Binding="{Binding Address}"/>
-                <DataGridTextColumn Width="70" Header="来源" Binding="{Binding DataSourceText}"/>
             </DataGrid.Columns>
         </DataGrid>
 

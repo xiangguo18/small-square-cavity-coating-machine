@@ -766,4 +766,79 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- 圆形触点开关：圆形主体随开/关/故障变色，名称显示在下方。 -->
+    <Style TargetType="{x:Type controls:RoundToggleButton}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="56"/>
+        <Setter Property="MinHeight" Value="56"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type controls:RoundToggleButton}">
+                    <Border Background="{TemplateBinding Background}"
+                            ToolTip="{TemplateBinding DeviceName}">
+                        <Viewbox Stretch="Uniform">
+                            <Canvas Width="120" Height="120">
+                                <Ellipse x:Name="InterlockLamp"
+                                         Canvas.Left="8" Canvas.Top="7"
+                                         Width="16" Height="16"
+                                         Fill="White"
+                                         Stroke="{StaticResource DeviceOutlineBrush}"
+                                         StrokeThickness="2"/>
+                                <Ellipse x:Name="ToggleBody"
+                                         Canvas.Left="26" Canvas.Top="10"
+                                         Width="66" Height="66"
+                                         Fill="{StaticResource DeviceIdleBrush}"
+                                         Stroke="{StaticResource DeviceOutlineBrush}"
+                                         StrokeThickness="4"/>
+                                <!-- 中心触点：随开/关状态呈现的开闭符号。 -->
+                                <Ellipse x:Name="ToggleCore"
+                                         Canvas.Left="52" Canvas.Top="36"
+                                         Width="14" Height="14"
+                                         Fill="{StaticResource DeviceOutlineBrush}"/>
+                                <TextBlock x:Name="DeviceLabel"
+                                           Canvas.Left="6" Canvas.Top="88"
+                                           Width="108" Height="22"
+                                           Text="{TemplateBinding DeviceName}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource DeviceOutlineBrush}"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsOn" Value="True">
+                            <Setter TargetName="ToggleBody" Property="Fill"
+                                    Value="{StaticResource DeviceActiveBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsInterlockReleased" Value="True">
+                            <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
+                        </Trigger>
+                        <Trigger Property="ShowInterlockIndicator" Value="False">
+                            <Setter TargetName="InterlockLamp" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="IsFaulted" Value="True">
+                            <Setter TargetName="ToggleBody" Property="Fill"
+                                    Value="{StaticResource DeviceFaultBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.75"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

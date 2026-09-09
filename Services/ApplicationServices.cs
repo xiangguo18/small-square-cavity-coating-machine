@@ -278,31 +278,25 @@ public sealed class ApplicationServices : IDisposable
             "模拟操作员",
             "加热",
             "设置目标温度",
-            "200 ℃",
             true,
             false,
-            string.Empty,
-            true));
+            string.Empty));
         OperationLogRepository.Add(new OperationLogRecord(
             now.AddHours(-5),
             "模拟操作员",
             "电源1",
             "启动电源",
-            string.Empty,
             true,
             false,
-            string.Empty,
-            true));
+            string.Empty));
         OperationLogRepository.Add(new OperationLogRecord(
             now.AddDays(-2),
             "模拟操作员",
             "前级阀",
             "打开阀门",
-            string.Empty,
             false,
             true,
-            "模拟互锁条件未满足",
-            true));
+            "模拟互锁条件未满足"));
 
     }
 }

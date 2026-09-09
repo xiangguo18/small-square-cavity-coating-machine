@@ -33,6 +33,7 @@ public interface IOpcUaEquipmentClient : IAlarmConnectionController, IAsyncDispo
 {
     bool IsSimulated { get; }
     bool RecipeAvailable => false;
+    string RecipeNodeDiagnostics => "";
     Task<IRecipeEquipmentLease> AcquireRecipeRunAsync(CancellationToken token) => throw new NotSupportedException("尚未实现配方会话");
     event EventHandler? SnapshotChanged;
     EquipmentSnapshot Snapshot();

@@ -14,6 +14,34 @@ public sealed partial class OpcUaEquipmentClient
     {
         get { lock (_gate) return _recipeLease is null && RecipeReady(); }
     }
+    /// <summary>返回 EQ_Recipe1 的实际元素类型、数组长度与配方覆盖范围，用于诊断写入 BadTypeMismatch。</summary>
+    public string RecipeNodeDiagnostics
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (!_groups.TryGetValue(EquipmentGroups.Recipe, out var recipe) || !recipe.IsReady)
+                    return "配方节点未就绪：EQ_Recipe1";
+                var type = recipe.Points.Values.Select(p => p.ValueType).Where(t => t is not null).Distinct().FirstOrDefault();
+                var count = _addresses.TryGetValue(EquipmentGroups.Recipe, out var addrs) ? addrs.Length : 0;
+                var actualLength = _recipeLease?.RecipeArrayLength;
+                return $"EQ_Recipe1 元素类型={TypeName(type)}，PLC实际数组长度={actualLength?.ToString() ?? "待写入前复核"}，"
+                    + $"配方覆盖项数={count}，最终发送载荷长度={actualLength?.ToString() ?? "待构造"}";
+            }
+        }
+    }
+    private static string TypeName(Type? type) => type == typeof(float) ? "FLOAT(REAL)"
+        : type == typeof(double) ? "DOUBLE(LREAL)"
+        : type == typeof(short) ? "INT16"
+        : type == typeof(ushort) ? "UINT16"
+        : type == typeof(int) ? "INT32"
+        : type == typeof(uint) ? "UINT32"
+        : type == typeof(long) ? "INT64"
+        : type == typeof(ulong) ? "UINT64"
+        : type == typeof(sbyte) ? "SINT8"
+        : type == typeof(byte) ? "UINT8"
+        : type?.Name ?? "未知";
     private bool RecipeReady() => _phase == AlarmConnectionPhase.Connected && _session is not null
         && EquipmentGroups.RecipePoints.All(g => _groups.TryGetValue(g, out var state) && state.IsReady
             && state.Points.Values.All(p => p.CanWrite));
@@ -48,6 +76,7 @@ public sealed partial class OpcUaEquipmentClient
             _recipePending = true; Notify();
         }
         var acquired = false;
+        RecipeLease? lease = null;
         try
         {
             acquired = await _lifecycle.WaitAsync(TimeSpan.FromSeconds(15), token).ConfigureAwait(false);
@@ -56,10 +85,13 @@ public sealed partial class OpcUaEquipmentClient
             {
                 if (_disposed || !RecipeReady() || _sessionLifetime is null) throw new InvalidOperationException("配方点未就绪、不可写或质量无效");
                 if (!_authorization.CanOperate(PermissionKey.ProcessRecipe)) throw new InvalidOperationException("没有工艺配方权限");
-                _recipeLease = new(this, _session!, _epoch, _options.EndpointUrl, _authorization.CurrentUserName, _sessionLifetime.Token, token);
+                lease = new(this, _session!, _epoch, _options.EndpointUrl, _authorization.CurrentUserName, _sessionLifetime.Token, token);
+                _recipeLease = lease;
                 _authorization.AccessChanged += RecipeAccessChanged;
-                return _recipeLease;
             }
+            try { await lease.InspectRecipeArrayAsync(token).ConfigureAwait(false); }
+            catch { await lease.DisposeAsync().ConfigureAwait(false); throw; }
+            return lease;
         }
         finally
         {
@@ -92,6 +124,7 @@ public sealed partial class OpcUaEquipmentClient
         public string Failure { get; private set; } = "";
         public CancellationToken Token => _stop.Token;
         public Type ArrayType { get { lock (_owner._gate) return _owner._groups[EquipmentGroups.Recipe].Points.Values.First().ValueType!; } }
+        internal int RecipeArrayLength { get; private set; }
         internal RecipeLease(OpcUaEquipmentClient owner, IEquipmentSession session, long epoch, string endpoint,
             string user, CancellationToken connection, CancellationToken caller)
         {
@@ -99,6 +132,23 @@ public sealed partial class OpcUaEquipmentClient
             _stop = CancellationTokenSource.CreateLinkedTokenSource(connection, caller);
         }
         internal void Abort(string reason) { Failure = reason; _stop.Cancel(); }
+        internal async Task InspectRecipeArrayAsync(CancellationToken caller)
+        {
+            Ensure();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Token, caller);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            var data = await _session.ReadGroupAsync(EquipmentGroups.Recipe, null, timeout.Token).ConfigureAwait(false);
+            Ensure();
+            if (!StatusCode.IsGood(data.StatusCode) || data.StatusCode.Overflow)
+                throw new InvalidOperationException($"EQ_Recipe1读取质量无效：{data.StatusCode}");
+            if (data.Value is not Array { Rank: 1 } array || array.GetLowerBound(0) != 0)
+                throw new InvalidOperationException($"EQ_Recipe1当前值不是下界为0的一维数组：{data.Value?.GetType().FullName ?? "null"}");
+            if (array.GetType().GetElementType() != ArrayType)
+                throw new InvalidOperationException($"EQ_Recipe1元数据类型={TypeName(ArrayType)}，当前值类型={array.GetType().FullName}，类型不一致");
+            if (array.Length < 18)
+                throw new InvalidOperationException($"EQ_Recipe1实际数组长度={array.Length}，不足配方所需18项");
+            RecipeArrayLength = array.Length;
+        }
         private void Ensure()
         {
             Token.ThrowIfCancellationRequested();

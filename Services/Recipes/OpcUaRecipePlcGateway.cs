@@ -29,11 +29,13 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
         if (request.Layers.Count == 0 || request.Layers.Select(l => l.Sequence).Distinct().Count() != request.Layers.Count)
             throw new InvalidOperationException("待执行配方为空或序号重复");
         _lease = await client.AcquireRecipeRunAsync(token).ConfigureAwait(false);
+        // 诊断：上报 EQ_Recipe1 识别到的元素类型与下发项数，便于比对 PLC 的 REAL 数组。
+        Notice = client.RecipeNodeDiagnostics;
         foreach (var layer in request.Layers) _blocks.Add(layer.Sequence, RecipeDefinitions.ConvertLayer(layer, _lease.ArrayType, definitions));
         var pending = new OperationLogRecord(DateTimeOffset.Now, _lease.User, request.RecipeName, "开始配方任务",
-            request.SequenceSummary, false, false, "", IsSimulated) {
+            false, false, "") {
             RecipeRunId = request.RunId, RecipeSnapshot = JsonSerializer.Serialize(request),
-            Endpoint = _lease.Endpoint, Outcome = "配方运行中" };
+            Outcome = "配方运行中" };
         await Task.Run(() => runtime.BeginWrite(pending), token).ConfigureAwait(false);
         _runAudit = pending;
         await _lease.TransactionAsync(t => FlagAsync(EquipmentGroups.CoatOk, false, t), token).ConfigureAwait(false);
@@ -82,8 +84,8 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
 
     private async Task StageAsync(string stage, string address, string value, Func<Task> action, CancellationToken token, bool final = false)
     {
-        var pending = new OperationLogRecord(DateTimeOffset.Now, _lease!.User, _runAudit!.Target, stage, value,
-            false, false, "", IsSimulated) { RecipeRunId = _runAudit.RecipeRunId, Endpoint = _lease.Endpoint, Address = address, Outcome = "待处理" };
+        var pending = new OperationLogRecord(DateTimeOffset.Now, _lease!.User, _runAudit!.Target, stage,
+            false, false, "") { RecipeRunId = _runAudit.RecipeRunId, Outcome = "待处理" };
         await Task.Run(() => runtime.BeginWrite(pending), token).ConfigureAwait(false);
         try { token.ThrowIfCancellationRequested(); await action().ConfigureAwait(false); }
         catch (Exception ex)
@@ -107,8 +109,7 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
         {
             if (_runAudit is not null)
                 await Task.Run(() => runtime.FinishWrite(_runAudit with { Outcome = result.IsCompleted ? "配方完成" : "停止自动下发·需人工核对",
-                    IsSuccessful = result.IsCompleted, FailureReason = result.FailureReason,
-                    SetValue = $"{_runAudit.SetValue}；完成{result.CompletedLayers}/{result.TotalLayers}层" }, null)).ConfigureAwait(false);
+                    IsSuccessful = result.IsCompleted, FailureReason = result.FailureReason }, null)).ConfigureAwait(false);
         }
         catch (Exception ex) { Notice += "；任务最终记录保存失败：" + ex.Message; }
         finally

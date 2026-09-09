@@ -17,14 +17,13 @@ public sealed partial class OpcUaEquipmentClient
         OperationLogRecord? audit = null;
         var sent = false;
         object? target = null;
-        object? previous = null;
         CancellationToken connectionToken = default;
         ControlWriteResult result;
         try
         {
             IEquipmentSession session;
             EquipmentPoint point;
-            string group, endpoint, user;
+            string group, user;
             int? index;
             lock (_gate)
             {
@@ -44,7 +43,6 @@ public sealed partial class OpcUaEquipmentClient
                 index = EquipmentGroups.IsScalar(group) ? null : EquipmentAddress.Index(request.Address, group);
                 session = _session;
                 connectionToken = _sessionLifetime.Token;
-                endpoint = _options.EndpointUrl;
                 user = _authorization.CurrentUserName;
                 _writeAddress = request.Address;
                 _writeStage = "正在校验并保存控制审计";
@@ -54,15 +52,8 @@ public sealed partial class OpcUaEquipmentClient
             }
 
             using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token, connectionToken);
-            previous = await ReadControlElementAsync(session, group, index, point.ValueType!, lifetime.Token).ConfigureAwait(false);
             var pending = new OperationLogRecord(DateTimeOffset.Now, user, request.Target, request.Action,
-                ParameterValueCodec.Format(target), false, false, "", IsSimulated)
-            {
-                Endpoint = endpoint,
-                Address = request.Address,
-                PreviousValue = ParameterValueCodec.Format(previous),
-                Outcome = "待处理"
-            };
+                false, false, "") { Outcome = "待处理" };
             await Task.Run(() => _runtime.BeginWrite(pending), lifetime.Token).ConfigureAwait(false);
             audit = pending;
 

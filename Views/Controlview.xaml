@@ -24,11 +24,11 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
-                <Trigger Property="Tag" Value="True">
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
                     <Setter Property="Background" Value="#55C878"/>
                     <Setter Property="BorderBrush" Value="#208844"/>
                     <Setter Property="Foreground" Value="White"/>
-                </Trigger>
+                </DataTrigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Opacity" Value="0.78"/>
                 </Trigger>
@@ -260,7 +260,7 @@
                                         IsReadingEnabled="{Binding HighVacuumGaugeIsReadingEnabled}"
                                         IsFaulted="{Binding HighVacuumGaugeIsFaulted}"
                                         CanToggle="False"
-                                        Unit="Pa" ValueFormat="0.0"/>
+                                        Unit="Pa" ValueFormat="0.0E+0"/>
                                     <controls:VacuumGaugeControl Canvas.Left="268" Canvas.Top="-12"
                                         Width="142" Height="106"
                                         DisplayName="薄膜真空度计"
@@ -269,12 +269,18 @@
                                         VacuumValue="{Binding FilmHighVacuumValue}"
                                         IsReadingEnabled="{Binding FilmGaugeIsReadingEnabled}"
                                         IsFaulted="{Binding FilmGaugeIsFaulted}"
-                                        ShowValveStatus="True"
-                                        IsValveOpen="{Binding FilmGaugeValveIsOpen}"
-                                        IsValveFaulted="{Binding FilmGaugeValveIsFaulted}"
-                                        CanToggle="True"
-                                        ToggleCommand="{Binding ToggleFilmGaugeCommand}"
-                                        Unit="Pa" ValueFormat="0.0"/>
+                                        CanToggle="False"
+                                        Unit="Pa" ValueFormat="0.0E+0" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                                    <!-- CG前级阀：从薄膜真空度计抽离的阀门触点开关，开=Part_Command[39]，关=Part_Command[40]，反馈=Part_State[20]。 -->
+                                    <controls:RoundToggleButton Canvas.Left="311" Canvas.Top="81"
+                                        Width="24" Height="38"
+                                        DeviceName="CG前级阀"
+                                        IsOn="{Binding FilmGaugeValveIsOpen}"
+                                        IsFaulted="{Binding FilmGaugeValveIsFaulted}"
+                                        ShowInterlockIndicator="False"
+                                        HorizontalAlignment="Center" VerticalAlignment="Top"
+                                        Command="{Binding ToggleFilmGaugeCommand}"
+                                        ToolTip="CG前级阀：开=Part_Command[39]，关=Part_Command[40]，反馈=Part_State[20]" RenderTransformOrigin="1.183,0.299"/>
                                     <controls:VacuumGaugeControl Canvas.Left="518" Canvas.Top="218"
                                         Width="138" Height="104"
                                         DisplayName="前级真空度计"
@@ -285,7 +291,7 @@
                                         IsReadingEnabled="{Binding ForelineGaugeIsReadingEnabled}"
                                         IsFaulted="{Binding ForelineGaugeIsFaulted}"
                                         CanToggle="False"
-                                        Unit="Pa" ValueFormat="0.0"/>
+                                        Unit="Pa" ValueFormat="0.0E+0"/>
 
                                     <!-- 六个气路阀沿三列与 MFC 对齐。 -->
                                     <controls:ValveControl Canvas.Left="70" Canvas.Top="320"
@@ -375,6 +381,7 @@
                                         IsFaulted="{Binding ApcIsFaulted}"
                                         IsInterlockReleased="{Binding ApcInterlockReleased}"
                                         ToggleModeCommand="{Binding ToggleApcModeCommand}"
+                                        ToggleValveCommand="{Binding ToggleApcValveCommand}"
                                         PositionSetpointCommand="{Binding SetApcPositionCommand}"
                                         PressureSetpointCommand="{Binding SetApcPressureCommand}" RenderTransformOrigin="0.459,0.686" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                                     <controls:ValveControl Canvas.Left="718" Canvas.Top="129"

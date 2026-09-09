@@ -159,15 +159,14 @@
                 <controls:ValveControl x:Name="ValveSymbol"
                                        Width="112"
                                        Height="108"
-                                       Focusable="False"
-                                       IsHitTestVisible="False"
                                        DeviceName="{Binding DisplayName, ElementName=Root}"
                                        Orientation="{Binding Orientation, ElementName=Root}"
-                                       IsOpen="False"
+                                       IsOpen="{Binding IsOpen, ElementName=Root}"
                                        UseOpeningPercentage="True"
                                        OpeningPercentage="{Binding CurrentPosition, ElementName=Root}"
                                        IsInterlockReleased="{Binding IsInterlockReleased, ElementName=Root}"
-                                       IsFaulted="{Binding IsFaulted, ElementName=Root}"/>
+                                       IsFaulted="{Binding IsFaulted, ElementName=Root}"
+                                       Command="{Binding ToggleValveCommand, ElementName=Root}"/>
             </Canvas>
         </Border>
     </Viewbox>

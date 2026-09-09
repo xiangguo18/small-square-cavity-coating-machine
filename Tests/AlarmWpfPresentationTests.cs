@@ -181,6 +181,8 @@ public sealed class AlarmWpfPresentationTests
             Render(parameterPage, "parameters-disconnected", 1440, 900);
             Render(controlPage, "control-part-state", 1440, 900);
             Assert.Equal(3, Descendants<VacuumGaugeControl>(controlPage).Count());
+            var cgValve = Assert.Single(Descendants<RoundToggleButton>(controlPage));
+            Assert.True(cgValve.IsOn);
             var mfcControls = Descendants<MfcFlowMeterControl>(controlPage).ToArray();
             Assert.Equal(3, mfcControls.Length);
             Assert.All(mfcControls, control => Assert.NotNull(control.SetpointCommand));

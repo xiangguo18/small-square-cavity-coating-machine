@@ -162,7 +162,7 @@ public sealed class SqliteEquipmentDefinitionRepository(string path) : IEquipmen
                 if (string.IsNullOrWhiteSpace(row.Name) || string.IsNullOrWhiteSpace(row.CommandAddress))
                     throw new InvalidOperationException("SystemCommandDef名称或命令地址为空");
                 ValidateScalar(row.CommandAddress, "系统命令");
-                if (!string.IsNullOrWhiteSpace(row.FeedbackAddress)) ValidateScalar(row.FeedbackAddress, "系统反馈");
+                if (!string.IsNullOrWhiteSpace(row.FeedbackAddress)) ValidateFeedbackAddress(row.FeedbackAddress);
                 if (!systemCommands.TryAdd(row.Name, row)) throw new InvalidOperationException($"SystemCommandDef重复：{row.Name}");
             }
         }
@@ -204,6 +204,19 @@ public sealed class SqliteEquipmentDefinitionRepository(string path) : IEquipmen
     {
         if (!EquipmentGroups.IsScalar(address) || !EquipmentGroups.Monitored.Contains(address, StringComparer.Ordinal))
             throw new InvalidOperationException($"{description}地址不是受支持的标量点：{address}");
+    }
+
+    /// <summary>系统反馈地址允许受支持的标量点，或用于按钮绿灯的 Part_State 数组元素。</summary>
+    private static void ValidateFeedbackAddress(string address)
+    {
+        if (EquipmentGroups.IsScalar(address) && EquipmentGroups.Monitored.Contains(address, StringComparer.Ordinal))
+            return;
+        if (EquipmentAddress.Group(address) == EquipmentGroups.PartState)
+        {
+            _ = EquipmentAddress.Index(address, EquipmentGroups.PartState);
+            return;
+        }
+        throw new InvalidOperationException($"系统反馈地址不是受支持的标量或Part_State元素：{address}");
     }
 
     private static void ValidateUnique(IEnumerable<string> addresses, IEnumerable<int> ids)

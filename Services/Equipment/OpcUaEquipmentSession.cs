@@ -221,14 +221,57 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
             if (group == EquipmentGroups.Recipe
                 ? value is not Array { Rank: 1, Length: 18 } || value.GetType().GetElementType() != binding.ElementType
                 : value.GetType() != binding.ElementType)
-                throw new InvalidOperationException("配方写入类型不匹配");
+                throw new InvalidOperationException($"配方写入类型不匹配：节点元素类型={RecipeTypeName(binding.ElementType)}，"
+                    + $"输入类型={value.GetType().FullName}");
+
+            object payload = value;
+            string diagnostics;
+            if (group == EquipmentGroups.Recipe)
+            {
+                var input = (Array)value;
+                var current = await ReadGroupAsync(group, null, token).ConfigureAwait(false);
+                if (!StatusCode.IsGood(current.StatusCode) || current.StatusCode.Overflow)
+                    throw new InvalidOperationException($"EQ_Recipe1整组读取质量无效：{current.StatusCode}；写入未执行");
+                if (current.Value is not Array { Rank: 1 } currentArray || currentArray.GetLowerBound(0) != 0)
+                    throw new InvalidOperationException($"EQ_Recipe1当前值不是下界为0的一维数组："
+                        + $"{current.Value?.GetType().FullName ?? "null"}；写入未执行");
+                if (currentArray.GetType().GetElementType() != binding.ElementType)
+                    throw new InvalidOperationException($"EQ_Recipe1节点元素类型={RecipeTypeName(binding.ElementType)}，"
+                        + $"当前值类型={currentArray.GetType().FullName}；写入未执行");
+                if (currentArray.Length < input.Length)
+                    throw new InvalidOperationException($"EQ_Recipe1实际数组长度={currentArray.Length}，"
+                        + $"不足配方覆盖项数={input.Length}；写入未执行");
+
+                var fullArray = Array.CreateInstance(binding.ElementType!, currentArray.Length);
+                Array.Copy(currentArray, fullArray, currentArray.Length);
+                Array.Copy(input, 0, fullArray, 0, input.Length);
+                payload = fullArray;
+                diagnostics = $"节点元素类型={RecipeTypeName(binding.ElementType)}，PLC实际数组长度={currentArray.Length}，"
+                    + $"配方输入类型={input.GetType().FullName}，配方覆盖项数={input.Length}，"
+                    + $"最终发送载荷类型={fullArray.GetType().FullName}，最终发送载荷长度={fullArray.Length}";
+            }
+            else
+            {
+                diagnostics = $"节点元素类型={RecipeTypeName(binding.ElementType)}，发送载荷类型={value.GetType().FullName}";
+            }
+
+            var variant = new Variant(payload);
+            if (group == EquipmentGroups.Recipe && (variant.TypeInfo.ValueRank != ValueRanks.OneDimension
+                || binding.ElementType == typeof(float) && variant.TypeInfo.BuiltInType != BuiltInType.Float
+                || binding.ElementType == typeof(double) && variant.TypeInfo.BuiltInType != BuiltInType.Double))
+                throw new InvalidOperationException($"EQ_Recipe1 Variant编码类型异常：BuiltInType={variant.TypeInfo.BuiltInType}，"
+                    + $"ValueRank={variant.TypeInfo.ValueRank}；{diagnostics}；写入未执行");
             var response = await _session.WriteAsync(null, new WriteValueCollection {
                 new WriteValue { NodeId = _groupNodes[group], AttributeId = Attributes.Value,
                     IndexRange = null,
-                    Value = new DataValue(new Variant(value)) } }, token).ConfigureAwait(false);
+                    Value = new DataValue(variant) } }, token).ConfigureAwait(false);
             var status = response.Results.Single();
-            if (!StatusCode.IsGood(status)) throw new InvalidOperationException($"PLC配方写入未成功：{status}；不降级、不重试");
+            if (!StatusCode.IsGood(status)) throw new InvalidOperationException($"PLC配方写入未成功：{status}；{diagnostics}；不降级、不重试");
         }
+
+        private static string RecipeTypeName(Type? type) => type == typeof(float) ? "FLOAT(REAL)/System.Single"
+            : type == typeof(double) ? "DOUBLE(LREAL)/System.Double"
+            : type?.FullName ?? "未知";
 
         private void DetachEquipmentHandlers()
         {

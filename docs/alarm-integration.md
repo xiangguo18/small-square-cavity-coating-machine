@@ -49,7 +49,7 @@
 ## 数据与历史
 
 - 原始A盘方腔.db未修改。项目资源 `Resources/Database/方腔.db` 的SHA256：
-  `DF6F898CE1543A72201CED6171DFFA5E506A12CEEBCDCB6D7ECAB91213AA4D24`。
+  `ec2722d62769d52ed5a67c2d2602958b32cac76abc1aefdfaa7880dd039afb3b`。
 - 首次运行按内容哈希释放到 `%LocalAppData%/SmallSquareCavityCoatingMachine/Database/方腔.definition-<hash>.db`，严格SQLite ReadOnly。
 - 真实报警记录写入 `alarm-history.db`；模拟记录写入独立的 `alarm-history.simulation.db`。
 - 报警记录保存失败时仍显示内存报警并明确提示；未成功落盘前退出，未保存记录可能丢失。

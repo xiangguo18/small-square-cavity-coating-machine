@@ -214,6 +214,14 @@ public partial class SampleStageSpeedControl : UserControl
 
     private void SetpointTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            RestoreSetpointText();
+            Keyboard.ClearFocus();
+            return;
+        }
+
         if (e.Key != Key.Enter)
         {
             return;

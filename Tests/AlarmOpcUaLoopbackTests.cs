@@ -176,9 +176,9 @@ public sealed class AlarmOpcUaLoopbackTests
                 _recipe = new BaseDataVariableState<float[]>(folder) {
                     NodeId = new NodeId("vendor.recipe.block", NamespaceIndex), BrowseName = new QualifiedName("EQ_Recipe1", NamespaceIndex),
                     DisplayName = "Recipe", ReferenceTypeId = ReferenceTypeIds.HasComponent, TypeDefinitionId = VariableTypeIds.BaseDataVariableType,
-                    DataType = DataTypeIds.Float, ValueRank = ValueRanks.OneDimension, ArrayDimensions = new uint[] {24},
+                    DataType = DataTypeIds.Float, ValueRank = ValueRanks.OneDimension, ArrayDimensions = new uint[] {200},
                     AccessLevel = AccessLevels.CurrentReadOrWrite, UserAccessLevel = AccessLevels.CurrentReadOrWrite,
-                    Value = Enumerable.Repeat(99f, 24).ToArray(), StatusCode = StatusCodes.Good, Timestamp = DateTime.UtcNow };
+                    Value = Enumerable.Repeat(99f, 200).ToArray(), StatusCode = StatusCodes.Good, Timestamp = DateTime.UtcNow };
                 BaseDataVariableState<bool> Flag(string browse, bool initial) => new(folder) {
                     NodeId = new NodeId("vendor." + browse, NamespaceIndex), BrowseName = new QualifiedName(browse, NamespaceIndex),
                     DisplayName = browse, ReferenceTypeId = ReferenceTypeIds.HasComponent, TypeDefinitionId = VariableTypeIds.BaseDataVariableType,
@@ -311,12 +311,22 @@ public sealed class AlarmOpcUaLoopbackTests
                 [new RecipeLayer { Sequence = 2, CathodeAPower = 230 }, new RecipeLayer { Sequence = 5, CathodeBPower = 320 }],
                 "序号2、5") { RecipeName = "回环实协议" }, new Progress<RecipeRunProgress>(), deadline.Token);
             Assert.True(run.IsCompleted, run.FailureReason);
+            Assert.Contains("PLC实际数组长度=200", run.Notice);
+            Assert.Contains("最终发送载荷长度=200", run.Notice);
             var recipeWrites = server.Nodes.Writes.ToArray();
             Assert.Equal(6, recipeWrites.Length);
             Assert.Equal("vendor.EQ_CoatOK", recipeWrites[0].Node.Identifier); Assert.False((bool)recipeWrites[0].Value);
             Assert.Equal("vendor.EQ_CoatOK", recipeWrites[^1].Node.Identifier); Assert.True((bool)recipeWrites[^1].Value);
             foreach (var item in recipeWrites.Where(w => w.Node.Identifier.Equals("vendor.recipe.block")))
-            { Assert.True(string.IsNullOrEmpty(item.Range)); Assert.Equal(18, Assert.IsType<float[]>(item.Value).Length); }
+            {
+                Assert.True(string.IsNullOrEmpty(item.Range));
+                var payload = Assert.IsType<float[]>(item.Value);
+                Assert.Equal(200, payload.Length);
+                var variant = new Variant(payload);
+                Assert.Equal(BuiltInType.Float, variant.TypeInfo.BuiltInType);
+                Assert.Equal(ValueRanks.OneDimension, variant.TypeInfo.ValueRank);
+                Assert.All(payload.Skip(18), v => Assert.Equal(99f, v));
+            }
             Assert.All(server.Nodes.RecipeValues.Skip(18), v => Assert.Equal(99f, v));
             var ops = server.Nodes.RecipeOperations.ToArray();
             var blocks = ops.Select((v,i) => (v,i)).Where(x => x.v == "write:array:").ToArray();

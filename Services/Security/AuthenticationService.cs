@@ -139,10 +139,8 @@ public sealed class AuthenticationService : IAuthenticationService
             userName,
             "用户会话",
             action,
-            string.Empty,
             successful,
             !successful,
-            failureReason,
-            false));
+            failureReason));
     }
 }

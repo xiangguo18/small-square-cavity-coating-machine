@@ -51,7 +51,7 @@ public sealed class EquipmentFeatureTests
             [EquipmentGroups.Alarm] = new bool[552], [EquipmentGroups.Io] = new bool[532],
             [EquipmentGroups.Parameter] = Enumerable.Repeat(5f,21).ToArray(),
             [EquipmentGroups.PartCommand] = new bool[1000],
-            [EquipmentGroups.PartState] = Enumerable.Repeat((ushort)1,500).ToArray(),
+            [EquipmentGroups.PartState] = InitialPartStates(),
             [EquipmentGroups.PartData] = new float[27],
             [EquipmentGroups.PartDataSet1] = new float[21],
             [EquipmentGroups.PartDataSet2] = new float[3],
@@ -68,6 +68,13 @@ public sealed class EquipmentFeatureTests
         public int SubscribeCount;
         public bool Disposed;
         public bool ApplyFeedback = true;
+        /// <summary>系统按钮绿灯槽（Part_State[30..35]）默认熄灭，按钮状态由 PLC 反馈写入。</summary>
+        private static ushort[] InitialPartStates()
+        {
+            var states = Enumerable.Repeat((ushort)1, 500).ToArray();
+            for (var i = 30; i <= 35; i++) states[i] = 0;
+            return states;
+        }
         public Func<int, object, CancellationToken, Task>? WriteHandler;
         public Func<int, CancellationToken, Task<DataValue>>? ElementRead;
         public Action<string, DataValue>? Callback;
@@ -105,6 +112,7 @@ public sealed class EquipmentFeatureTests
             if (Scalars.ContainsKey(group)) Scalars[group] = (bool)value;
             else if (index.HasValue) Values[group].SetValue(value,index.Value);
             else throw new InvalidOperationException("数组控制点缺少下标");
+            ApplySystemFeedback(group, value);
             ApplyPartCommandFeedback(group, index, value);
             Send(group);
             return Task.CompletedTask;
@@ -120,6 +128,7 @@ public sealed class EquipmentFeatureTests
                 if (group == EquipmentGroups.PartCommand && Equals(mutation.Value, true))
                     ApplyPartCommandFeedback(group, mutation.Index, mutation.Value);
             }
+            if (group == EquipmentGroups.PartCommand) ApplyWorkflowFeedbackFromValues();
             Send(group);
             return Task.CompletedTask;
         }
@@ -148,6 +157,43 @@ public sealed class EquipmentFeatureTests
             if (feedback.Part >= 0)
                 Values[EquipmentGroups.PartState].SetValue(
                     feedback.Open ? (ushort)2 : (ushort)1, feedback.Part);
+        }
+        private void ApplySystemFeedback(string group, object value)
+        {
+            if (!ApplyFeedback) return;
+            if (!group.StartsWith("EQ_", StringComparison.Ordinal) || group == EquipmentGroups.PassInterlock) return;
+            var (output, stateIndex) = group switch
+            {
+                "EQ_Manual" => ("fbButtonManual_Output", 30),
+                "EQ_Auto" => ("fbButtonAuto_Output", 32),
+                "EQ_Semi" => ("fbButtonSemi_Output", 31),
+                "EQ_Start" => ("fbButtonStart_Output", 33),
+                "EQ_Stop" => ("fbButtonStop_Output", 34),
+                "EQ_Reset" => ("fbButtonReset_Output", 35),
+                _ => ("", -1)
+            };
+            if (output.Length > 0 && Scalars.ContainsKey(output))
+            {
+                Scalars[output] = (bool)value;
+                Send(output);
+            }
+            if (stateIndex >= 0)
+            {
+                Values[EquipmentGroups.PartState].SetValue((bool)value ? (ushort)1 : (ushort)0, stateIndex);
+                Send(EquipmentGroups.PartState);
+            }
+        }
+        private void ApplyWorkflowFeedbackFromValues()
+        {
+            if (!ApplyFeedback) return;
+            var commands = Values[EquipmentGroups.PartCommand];
+            bool Active(int index) => commands.GetValue(index) is bool b && b;
+            Scalars["fbButtonPumpStart_Output"] = Active(980);
+            Scalars["fbButtonVentStart_Output"] = Active(981);
+            Scalars["fbButtonHP_Start_Output"] = Active(982);
+            Send("fbButtonPumpStart_Output");
+            Send("fbButtonVentStart_Output");
+            Send("fbButtonHP_Start_Output");
         }
         public void Send(string group, StatusCode? quality = null) =>
             Callback?.Invoke(group, new DataValue(new Variant(Scalars.TryGetValue(group,out var scalar) ? scalar : Values[group].Clone())) { StatusCode = quality ?? StatusCodes.Good });
@@ -282,9 +328,11 @@ public sealed class EquipmentFeatureTests
         for(var i=0;i<20;i++) Assert.Equal(neighbors[i],h.Session.Values[EquipmentGroups.Parameter].GetValue(i));
         var restarted=new EquipmentRuntimeRepository(Path.Combine(h.Temp.Path,"equipment-runtime.db"));
         var audit=Assert.Single(restarted.Query(DateTimeOffset.MinValue,DateTimeOffset.MaxValue));
-        Assert.Equal("已确认",audit.Outcome); Assert.Equal("5",audit.PreviousValue); Assert.Equal("8500",audit.SetValue);
-        Assert.Equal("测试工程师",audit.UserName); Assert.Equal(h.Settings.Options.EndpointUrl,audit.Endpoint);
-        Assert.Equal("8500",Assert.Single(restarted.LoadCache(audit.Endpoint)).Value);
+        Assert.Equal("已确认",audit.Outcome);
+        Assert.Equal("测试工程师",audit.UserName);
+        var cache=Assert.Single(restarted.LoadCache(h.Settings.Options.EndpointUrl));
+        Assert.Equal("8500",cache.Value);
+        Assert.Equal(h.Settings.Options.EndpointUrl,cache.Endpoint);
         Assert.Empty(restarted.LoadCache("opc.tcp://another:4840"));
     }
     [Theory] [InlineData("NaN")] [InlineData("Infinity")] [InlineData("-1")] [InlineData("61")] [InlineData("abc")]
@@ -429,7 +477,7 @@ public sealed class EquipmentFeatureTests
         var snapshot=client.Snapshot();
         var result=await client.WriteParameterAsync(new("EQ_Parameter1[0]","8",snapshot.Groups[EquipmentGroups.Parameter].Points["EQ_Parameter1[0]"].Value!,snapshot.Epoch));
         Assert.Equal(ParameterWriteOutcome.Confirmed,result.Outcome);
-        Assert.True(Assert.Single(h.Runtime.All).IsSimulated);
+        Assert.True(Assert.Single(h.Runtime.LoadCache(snapshot.Endpoint)).IsSimulated);
     }
     [Fact] public void Numeric_types_use_exact_server_type_and_check_after_float_rounding()
     {
@@ -446,7 +494,7 @@ public sealed class EquipmentFeatureTests
     {
         using var temp=new AlarmFeatureTests.TemporaryDirectory();
         var path=Path.Combine(temp.Path,"runtime.db"); var runtime=new EquipmentRuntimeRepository(path);
-        var record=new OperationLogRecord(DateTimeOffset.Now,"u","p","write","1",false,false,"",true){Outcome="待处理"};
+        var record=new OperationLogRecord(DateTimeOffset.Now,"u","p","write",false,false,""){Outcome="待处理"};
         runtime.BeginWrite(record);
         var restarted=new EquipmentRuntimeRepository(path);
         Assert.Equal("结果未确认",Assert.Single(restarted.Query(DateTimeOffset.MinValue,DateTimeOffset.MaxValue)).Outcome);

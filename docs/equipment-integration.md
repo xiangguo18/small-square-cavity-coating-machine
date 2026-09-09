@@ -61,7 +61,7 @@ Operations保存操作审计，ParameterCache以Endpoint+Address区分已确认�
 模拟模式使用独立 `equipment-runtime.simulation.db`，审计标注“模拟”，真实模式不注入模拟数据。
 
 原始方腔.db不改写。内嵌资源已按配方任务同步新版MultiRecipeDef，报警、IO和参数定义不变。当前资源SHA256：
-`DF6F898CE1543A72201CED6171DFFA5E506A12CEEBCDCB6D7ECAB91213AA4D24`。
+`ec2722d62769d52ed5a67c2d2602958b32cac76abc1aefdfaa7880dd039afb3b`。
 
 ## 验证与现场边界
 

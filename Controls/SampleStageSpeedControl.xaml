@@ -23,11 +23,11 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
-                <Trigger Property="Tag" Value="True">
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
                     <Setter Property="Background" Value="#55C878"/>
                     <Setter Property="BorderBrush" Value="#208844"/>
                     <Setter Property="Foreground" Value="White"/>
-                </Trigger>
+                </DataTrigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Opacity" Value="0.78"/>
                 </Trigger>

@@ -121,6 +121,13 @@ public partial class ApcValveControl : UserControl
             typeof(ApcValveControl),
             new FrameworkPropertyMetadata(null));
 
+    public static readonly DependencyProperty ToggleValveCommandProperty =
+        DependencyProperty.Register(
+            nameof(ToggleValveCommand),
+            typeof(ICommand),
+            typeof(ApcValveControl),
+            new FrameworkPropertyMetadata(null));
+
     public string DisplayName
     {
         get => (string)GetValue(DisplayNameProperty);
@@ -205,10 +212,24 @@ public partial class ApcValveControl : UserControl
         set => SetValue(PressureSetpointCommandProperty, value);
     }
 
+    public ICommand? ToggleValveCommand
+    {
+        get => (ICommand?)GetValue(ToggleValveCommandProperty);
+        set => SetValue(ToggleValveCommandProperty, value);
+    }
+
     private void PositionSetpointTextBox_PreviewKeyDown(
         object sender,
         KeyEventArgs e)
     {
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            RestorePositionText();
+            Keyboard.ClearFocus();
+            return;
+        }
+
         if (e.Key != Key.Enter)
         {
             return;

@@ -359,11 +359,9 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
             _authorization?.CurrentUserName ?? "本地操作员",
             target,
             action,
-            string.Empty,
             successful,
             !successful,
-            failureReason,
-            _plcGateway.IsSimulated));
+            failureReason));
     }
 
     private void GatewayAvailabilityChanged(object? sender, EventArgs e)

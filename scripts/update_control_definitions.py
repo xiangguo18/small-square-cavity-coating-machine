@@ -172,12 +172,12 @@ def main() -> None:
             )
 
             system_commands = [
-                ("Manual", "手动", "EQ_Manual", "EQ_Manual_En", "fbButtonManual_Output", 0),
-                ("Auto", "自动", "EQ_Auto", "EQ_Auto_En", "fbButtonAuto_Output", 0),
-                ("Semi", "半自动", "EQ_Semi", "EQ_Semi_En", "fbButtonSemi_Output", 0),
-                ("Start", "系统开启", "EQ_Start", "EQ_Start_En", "fbButtonStart_Output", 0),
-                ("Stop", "系统停止", "EQ_Stop", "EQ_Stop_En", "fbButtonStop_Output", 0),
-                ("Reset", "系统复位", "EQ_Reset", "EQ_Reset_En", "fbButtonReset_Output", 0),
+                ("Manual", "手动", "EQ_Manual", "EQ_Manual_En", "Part_State[30]", 0),
+                ("Auto", "自动", "EQ_Auto", "EQ_Auto_En", "Part_State[32]", 0),
+                ("Semi", "半自动", "EQ_Semi", "EQ_Semi_En", "Part_State[31]", 0),
+                ("Start", "系统开启", "EQ_Start", "EQ_Start_En", "Part_State[33]", 0),
+                ("Stop", "系统停止", "EQ_Stop", "EQ_Stop_En", "Part_State[34]", 0),
+                ("Reset", "系统复位", "EQ_Reset", "EQ_Reset_En", "Part_State[35]", 0),
                 ("PassInterlock", "互锁解除", "EQ_PassInterlock", "", "EQ_PassInterlock", 1),
             ]
             connection.execute("DELETE FROM SystemCommandDef")

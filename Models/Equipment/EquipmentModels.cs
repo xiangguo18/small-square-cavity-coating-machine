@@ -26,7 +26,8 @@ public static class EquipmentGroups
         "EQ_Start", "fbButtonStart_Output",
         "EQ_Stop", "fbButtonStop_Output",
         "EQ_Reset", "fbButtonReset_Output",
-        PassInterlock
+        PassInterlock,
+        "fbButtonPumpStart_Output", "fbButtonVentStart_Output", "fbButtonHP_Start_Output"
     ];
     public static readonly string[] ControlArrays =
     [

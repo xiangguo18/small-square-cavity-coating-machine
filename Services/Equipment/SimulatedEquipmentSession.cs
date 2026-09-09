@@ -15,7 +15,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
     private readonly float[] _recipe = new float[24];
     private readonly float[] _process;
     private readonly bool[] _partCommands = new bool[1000];
-    private readonly ushort[] _partStates = Enumerable.Repeat((ushort)1, 500).ToArray();
+    private readonly ushort[] _partStates = InitialPartStates();
     private readonly float[] _partData = new float[27];
     private readonly float[] _partDataSet1 = new float[21];
     private readonly float[] _partDataSet2 = new float[3];
@@ -25,6 +25,15 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
     private bool _recipeOk = true, _coatOk = true;
     private Session? _current;
     private bool _online = true;
+
+    /// <summary>系统按钮绿灯槽（Part_State[30..35]）默认熄灭，按钮状态由 PLC 反馈写入。</summary>
+    private static ushort[] InitialPartStates()
+    {
+        var states = Enumerable.Repeat((ushort)1, 500).ToArray();
+        for (var i = 30; i <= 35; i++) states[i] = 0;
+        return states;
+    }
+
     public SimulatedEquipmentSessionFactory(IReadOnlyList<ParameterDefinition> parameters, IReadOnlyList<ProcessDefinition>? processDefinitions = null)
     {
         _processDefinitions = processDefinitions ?? [];
@@ -157,6 +166,18 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
                     owner.Values(group).SetValue(mutation.Value, mutation.Index);
                     ApplyFeedback(group, mutation.Index, mutation.Value);
                 }
+                // 真空流程按钮反馈：由最终 Part_Command[980..982] 计算互斥的 fbButton*_Output。
+                if (group == EquipmentGroups.PartCommand)
+                {
+                    var commands = owner.Values(group);
+                    bool Active(int i) => commands.GetValue(i) is bool b && b;
+                    owner._scalars["fbButtonPumpStart_Output"] = Active(980);
+                    owner._scalars["fbButtonVentStart_Output"] = Active(981);
+                    owner._scalars["fbButtonHP_Start_Output"] = Active(982);
+                    Publish("fbButtonPumpStart_Output");
+                    Publish("fbButtonVentStart_Output");
+                    Publish("fbButtonHP_Start_Output");
+                }
                 Publish(group);
                 return Task.CompletedTask;
             }
@@ -205,13 +226,22 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
             }
             else if (group.StartsWith("EQ_", StringComparison.Ordinal) && group != EquipmentGroups.PassInterlock)
             {
-                var output = group switch
+                var (output, stateIndex) = group switch
                 {
-                    "EQ_Manual" => "fbButtonManual_Output", "EQ_Auto" => "fbButtonAuto_Output",
-                    "EQ_Semi" => "fbButtonSemi_Output", "EQ_Start" => "fbButtonStart_Output",
-                    "EQ_Stop" => "fbButtonStop_Output", "EQ_Reset" => "fbButtonReset_Output", _ => ""
+                    "EQ_Manual" => ("fbButtonManual_Output", 30),
+                    "EQ_Auto" => ("fbButtonAuto_Output", 32),
+                    "EQ_Semi" => ("fbButtonSemi_Output", 31),
+                    "EQ_Start" => ("fbButtonStart_Output", 33),
+                    "EQ_Stop" => ("fbButtonStop_Output", 34),
+                    "EQ_Reset" => ("fbButtonReset_Output", 35),
+                    _ => ("", -1)
                 };
                 if (output.Length > 0) { owner._scalars[output] = (bool)value; Publish(output); }
+                if (stateIndex >= 0)
+                {
+                    owner._partStates[stateIndex] = (bool)value ? (ushort)1 : (ushort)0;
+                    Publish(EquipmentGroups.PartState);
+                }
             }
         }
         public Task WriteRecipeValueAsync(string group, object value, CancellationToken token)

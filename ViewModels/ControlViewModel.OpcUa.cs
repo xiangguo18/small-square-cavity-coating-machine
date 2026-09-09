@@ -89,7 +89,8 @@ public partial class ControlViewModel : IDisposable
     private void SetTurboPumpSpeed(double value)
     {
         if (!EnsureCanOperate()) return;
-        if (!TryQueueSetpoint(0, value)) TurboPumpSetpointSpeed = value;
+        TurboPumpSetpointSpeed = value;
+        _ = TryQueueSetpoint(0, value);
     }
 
     private void ControlServiceChanged(object? sender, EventArgs e)
@@ -162,11 +163,15 @@ public partial class ControlViewModel : IDisposable
         ApcIsOpen = apc.Open;
         ApcIsFaulted = apc.Fault;
 
-        ForelineGaugeIsReadingEnabled = forelineGauge.Open;
+        // 读数可用性由实测真空度数据点质量决定；Part_State 开位仅用于故障/阀状态标识，不再门控读数。
+        ForelineVacuumValue = Number(snapshot, "Part_Data1[10]");
+        ForelineGaugeIsReadingEnabled = double.IsFinite(ForelineVacuumValue);
         ForelineGaugeIsFaulted = forelineGauge.Fault;
-        HighVacuumGaugeIsReadingEnabled = highVacuumGauge.Open;
+        HighVacuumValue = Number(snapshot, "Part_Data1[11]");
+        HighVacuumGaugeIsReadingEnabled = double.IsFinite(HighVacuumValue);
         HighVacuumGaugeIsFaulted = highVacuumGauge.Fault;
-        FilmGaugeIsReadingEnabled = filmGauge.Open;
+        FilmHighVacuumValue = Number(snapshot, "Part_Data1[12]");
+        FilmGaugeIsReadingEnabled = double.IsFinite(FilmHighVacuumValue);
         FilmGaugeIsFaulted = filmGauge.Fault;
         FilmGaugeValveIsOpen = filmGaugeValve.Open;
         FilmGaugeValveIsFaulted = filmGaugeValve.Fault;
@@ -178,33 +183,35 @@ public partial class ControlViewModel : IDisposable
         LowerForelineValveIsFaulted = ventValve.Fault;
 
         TurboPumpCurrentSpeed = Number(snapshot, "Part_Data1[0]");
-        TurboPumpSetpointSpeed = Number(snapshot, "Part_Data_Set1[0]");
         ApcCurrentPosition = Number(snapshot, "Part_Data1[1]");
-        ApcPositionSetpoint = Number(snapshot, "Part_Data_Set1[1]");
         ApcIsPositioningMode = true;
         ApcCurrentPressure = double.NaN;
         ApcPressureSetpoint = double.NaN;
         HeaterCurrentTemperature = Number(snapshot, "Part_Data1[2]");
-        HeaterSetpointTemperature = Number(snapshot, "Part_Data_Set1[2]");
         SampleStageCurrentSpeed = Number(snapshot, "Part_Data1[3]");
-        SampleStageSetpointSpeed = Number(snapshot, "Part_Data_Set2[2]");
         ArgonCurrentFlow = Number(snapshot, "Part_Data1[7]");
         NitrogenCurrentFlow = Number(snapshot, "Part_Data1[8]");
         OxygenCurrentFlow = Number(snapshot, "Part_Data1[9]");
-        ArgonSetpointFlow = Number(snapshot, "Part_Data_Set1[4]");
-        NitrogenSetpointFlow = Number(snapshot, "Part_Data_Set1[5]");
-        OxygenSetpointFlow = Number(snapshot, "Part_Data_Set1[6]");
-        ForelineVacuumValue = Number(snapshot, "Part_Data1[10]");
-        HighVacuumValue = Number(snapshot, "Part_Data1[11]");
-        FilmHighVacuumValue = Number(snapshot, "Part_Data1[12]");
         Power1MeasuredPower = Number(snapshot, "Part_Data1[21]");
         Power1MeasuredVoltage = Number(snapshot, "Part_Data1[22]");
         Power1MeasuredCurrent = Number(snapshot, "Part_Data1[23]");
-        Power1Setpoint = Number(snapshot, "Part_Data_Set2[0]");
         Power2MeasuredPower = Number(snapshot, "Part_Data1[24]");
         Power2MeasuredVoltage = Number(snapshot, "Part_Data1[25]");
         Power2MeasuredCurrent = Number(snapshot, "Part_Data1[26]");
-        Power2Setpoint = Number(snapshot, "Part_Data_Set2[1]");
+
+        // 写入进行中不覆盖刚刚录入的乐观设定值，写入完成后由快照回读校准。
+        if (!snapshot.IsWriting)
+        {
+            TurboPumpSetpointSpeed = Number(snapshot, "Part_Data_Set1[0]");
+            ApcPositionSetpoint = Number(snapshot, "Part_Data_Set1[1]");
+            HeaterSetpointTemperature = Number(snapshot, "Part_Data_Set1[2]");
+            SampleStageSetpointSpeed = Number(snapshot, "Part_Data_Set2[2]");
+            ArgonSetpointFlow = Number(snapshot, "Part_Data_Set1[4]");
+            NitrogenSetpointFlow = Number(snapshot, "Part_Data_Set1[5]");
+            OxygenSetpointFlow = Number(snapshot, "Part_Data_Set1[6]");
+            Power1Setpoint = Number(snapshot, "Part_Data_Set2[0]");
+            Power2Setpoint = Number(snapshot, "Part_Data_Set2[1]");
+        }
 
         ApcInterlockReleased = Boolean(snapshot, ApcIsOpen ? "EQ_Interlock[7]" : "EQ_Interlock[6]");
         BypassValveInterlockReleased = Boolean(snapshot, BypassValveIsOpen ? "EQ_Interlock[1]" : "EQ_Interlock[0]");
@@ -214,11 +221,44 @@ public partial class ControlViewModel : IDisposable
         NitrogenLowerValveInterlockReleased = Boolean(snapshot, NitrogenLowerValveIsOpen ? "EQ_Interlock[13]" : "EQ_Interlock[12]");
         OxygenLowerValveInterlockReleased = Boolean(snapshot, OxygenLowerValveIsOpen ? "EQ_Interlock[15]" : "EQ_Interlock[14]");
 
+        // 按钮绿灯由 Part_State[30..35] 持续订阅驱动；断连/质量无效返回 false，fail-closed。
+        SystemIsRunning = ButtonFeedback(snapshot, "Start");
+        SystemIsStopped = ButtonFeedback(snapshot, "Stop");
+        SystemResetIsActive = ButtonFeedback(snapshot, "Reset");
+        AutomaticModeIsSelected = ButtonFeedback(snapshot, "Auto");
+        SemiAutomaticModeIsSelected = ButtonFeedback(snapshot, "Semi");
+        ManualModeIsSelected = ButtonFeedback(snapshot, "Manual");
+        VacuumingIsSelected = ButtonFeedback(snapshot, "PumpStart");
+        VentingIsSelected = ButtonFeedback(snapshot, "VentStart");
+        PressureHoldingIsSelected = ButtonFeedback(snapshot, "HP_Start");
+
         var bypass = Boolean(snapshot, EquipmentGroups.PassInterlock);
         ApplicationStatusViewModel.Instance.MaintenanceBypassActive = bypass;
         if (!snapshot.IsConnected) ResetCommandActiveStates();
         ControlStatusText = snapshot.IsConnected ? "PLC控制点已连接" : "PLC控制点未连接，设备状态不可用";
     }
+
+    /// <summary>读取某系统按钮的 PLC 反馈点，决定绿灯是否点亮；命名命令优先取定义库的 FeedbackAddress。</summary>
+    private bool ButtonFeedback(EquipmentSnapshot snapshot, string key)
+    {
+        var address = key switch
+        {
+            "Start" => SystemFeedback("Start") ?? "Part_State[33]",
+            "Stop" => SystemFeedback("Stop") ?? "Part_State[34]",
+            "Reset" => SystemFeedback("Reset") ?? "Part_State[35]",
+            "Auto" => SystemFeedback("Auto") ?? "Part_State[32]",
+            "Semi" => SystemFeedback("Semi") ?? "Part_State[31]",
+            "Manual" => SystemFeedback("Manual") ?? "Part_State[30]",
+            "PumpStart" => "fbButtonPumpStart_Output",
+            "VentStart" => "fbButtonVentStart_Output",
+            "HP_Start" => "fbButtonHP_Start_Output",
+            _ => "",
+        };
+        return !string.IsNullOrWhiteSpace(address) && Truthy(snapshot, address);
+    }
+
+    private string? SystemFeedback(string name) =>
+        _controlService?.Definitions.SystemCommands.GetValueOrDefault(name)?.FeedbackAddress;
 
     private static (bool Known, bool Open, bool Fault) State(EquipmentSnapshot snapshot, int index)
     {
@@ -248,6 +288,16 @@ public partial class ControlViewModel : IDisposable
 
     private static bool Boolean(EquipmentSnapshot snapshot, string address) =>
         Point(snapshot, address) is { Quality: AlarmQuality.Good, Value: true };
+
+    /// <summary>Part_State 元素为数值位/0-1，系统按钮绿灯按“非零或布尔真”判读，而非仅认 C# bool true。</summary>
+    private static bool Truthy(EquipmentSnapshot snapshot, string address)
+    {
+        var point = Point(snapshot, address);
+        if (point is not { Quality: AlarmQuality.Good } || point.Value is null) return false;
+        if (point.Value is bool boolean) return boolean;
+        try { return Convert.ToUInt64(point.Value) != 0; }
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException) { return false; }
+    }
 
     private static double Number(EquipmentSnapshot snapshot, string address)
     {
@@ -289,10 +339,6 @@ public partial class ControlViewModel : IDisposable
             _dispatcher?.Post(() =>
             {
                 ControlStatusText = result.Message;
-                if (result.Outcome != ControlWriteOutcome.Confirmed) return;
-                VacuumingIsSelected = id == 980;
-                VentingIsSelected = id == 981;
-                PressureHoldingIsSelected = id == 982;
             });
         });
         return true;
@@ -348,43 +394,17 @@ public partial class ControlViewModel : IDisposable
         return true;
     }
 
-    /// <summary>按“写入成功→亮灯、同组互斥”刷新命令按钮的本机选中态。</summary>
+    /// <summary>按钮绿灯由 Part_State[30..35] 反馈驱动；此处仅保留复位的本地互斥清理（样品台方向灯无独立复盘反馈）。</summary>
     private void ApplySystemCommandSelection(string name)
     {
-        switch (name)
-        {
-            case "Start":
-                SystemIsRunning = true;
-                SystemIsStopped = false;
-                SystemResetIsActive = false;
-                break;
-            case "Stop":
-                SystemIsRunning = false;
-                SystemIsStopped = true;
-                SystemResetIsActive = false;
-                break;
-            case "Reset":
-                SystemIsRunning = false;
-                SystemIsStopped = false;
-                SystemResetIsActive = true;
-                ClearModeAndWorkflowAndStageSelection();
-                break;
-            case "Auto":
-                AutomaticModeIsSelected = true;
-                SemiAutomaticModeIsSelected = false;
-                ManualModeIsSelected = false;
-                break;
-            case "Semi":
-                AutomaticModeIsSelected = false;
-                SemiAutomaticModeIsSelected = true;
-                ManualModeIsSelected = false;
-                break;
-            case "Manual":
-                AutomaticModeIsSelected = false;
-                SemiAutomaticModeIsSelected = false;
-                ManualModeIsSelected = true;
-                break;
-        }
+        if (name == "Reset") ClearSampleStageDirection();
+    }
+
+    private void ClearSampleStageDirection()
+    {
+        SampleStageIsForwardRunning = false;
+        SampleStageIsReverseRunning = false;
+        SampleStageIsStopped = false;
     }
 
     /// <summary>运行模式、真空控制、样品台方向三组的按钮灯全部熄灭（系统复位/断连时使用）。</summary>
@@ -418,31 +438,6 @@ public partial class ControlViewModel : IDisposable
         {
             var result = await service.WriteSetpointAsync(dataId, value, PermissionKey.SystemStatus).ConfigureAwait(false);
             _dispatcher?.Post(() => ControlStatusText = result.Message);
-        });
-        return true;
-    }
-
-    private bool TryQueueApcPosition(double value)
-    {
-        if (_controlService is null) return false;
-        var service = _controlService;
-        // 定位模式下：设定值 0 = 关闭，正数 = 开启，并联动开/关地址对互斥。
-        var opening = value > 0d;
-        var assertId = opening ? 6 : 7;
-        var deassertId = opening ? 7 : 6;
-        var action = opening ? "开启" : "关闭";
-        _ = Task.Run(async () =>
-        {
-            // 一次读整组→互斥置0+断言置1→整组写回；互锁由底层校验，成功后观察 Part_State 反馈。
-            var result = await service.ExecutePartCommandBatchAsync(assertId, [deassertId], "APC阀", action).ConfigureAwait(false);
-            var message = result.Message;
-            // 仅当主命令状态反馈到位时才下发设定值；被互锁/权限/状态未确认则不下发（fail-closed）。
-            if (result.Outcome == ControlWriteOutcome.Confirmed)
-            {
-                var setpoint = await service.WriteSetpointAsync(1, value, PermissionKey.SystemStatus).ConfigureAwait(false);
-                message = setpoint.Message;
-            }
-            _dispatcher?.Post(() => ControlStatusText = message);
         });
         return true;
     }

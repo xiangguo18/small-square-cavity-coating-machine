@@ -67,6 +67,12 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
                 _addresses[group.Key] = merged;
             }
         }
+        // 保证所有系统控制标量点（含真空流程 fbButton*_Output 反馈）都被订阅；仅在存在控制定义时补齐，
+        // 避免无定义库的简化连接（如回环测试）去订阅服务器不存在的标量节点。
+        if (controlDefinitions is not null)
+            foreach (var point in EquipmentGroups.SystemControlPoints)
+                if (!_addresses.ContainsKey(point))
+                    _addresses[point] = [point];
         foreach (var pair in _addresses)
             foreach (var address in pair.Value)
                 if (!_addressGroups.TryAdd(address, pair.Key) && _addressGroups[address] != pair.Key)
@@ -335,12 +341,13 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
         CancellationToken connectionToken = default;
         ParameterWriteResult result;
         object? target = null;
+        string endpoint = "";
         try
         {
             IEquipmentSession session;
             ParameterDefinition definition;
             EquipmentPoint point;
-            string endpoint, user;
+            string user;
             lock (_gate)
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
@@ -367,8 +374,7 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
             if (ParameterValueCodec.Same(original, target))
                 return new(ParameterWriteOutcome.Unchanged, "与PLC当前值相同，未发送写入", original);
             var pending = new OperationLogRecord(DateTimeOffset.Now, user, definition.DisplayName,
-                $"参数写入 {request.Address}", ParameterValueCodec.Format(target), false, false, "", IsSimulated) {
-                Endpoint = endpoint, Address = request.Address, PreviousValue = ParameterValueCodec.Format(original), Outcome = "待处理" };
+                $"参数写入 {request.Address}", false, false, "") { Outcome = "待处理" };
             await Task.Run(() => _runtime.BeginWrite(pending), lifetime.Token).ConfigureAwait(false);
             audit = pending;
             lifetime.Token.ThrowIfCancellationRequested();
@@ -425,7 +431,7 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
                         : result.Outcome == ParameterWriteOutcome.Unknown ? "结果未确认" : "已拒绝",
                     FailureReason = result.Outcome == ParameterWriteOutcome.Confirmed ? "" : result.Message };
                 var cache = result.Outcome == ParameterWriteOutcome.Confirmed
-                    ? new ParameterCache(audit.Endpoint, audit.Address, ParameterValueCodec.Format(target), DateTimeOffset.Now, IsSimulated) : null;
+                    ? new ParameterCache(endpoint, request.Address, ParameterValueCodec.Format(target), DateTimeOffset.Now, IsSimulated) : null;
                 try { await Task.Run(() => _runtime.FinishWrite(final, cache), CancellationToken.None).ConfigureAwait(false); }
                 catch (Exception ex) { result = result with { Message = result.Message + "；本机记录保存失败：" + ex.Message }; }
             }
