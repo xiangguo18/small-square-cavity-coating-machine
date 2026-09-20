@@ -4,6 +4,7 @@ using OxyPlot.Series;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.ViewModels.History;
+using System.Globalization;
 using System.Windows.Threading;
 using Xunit;
 
@@ -12,6 +13,7 @@ namespace Small_square_cavity_coating_machine.Tests;
 public sealed class HistoryTrendViewModelTests
 {
     private static readonly TimeSpan LiveWindow = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan RefreshedLiveWindow = TimeSpan.FromMinutes(10);
     private static readonly double LiveRightMargin = LiveWindow.TotalDays * 0.02d;
 
     [Fact]
@@ -154,11 +156,11 @@ public sealed class HistoryTrendViewModelTests
         store.Append(CreateSample(start.AddMinutes(31)));
 
         var timeAxis = GetTimeAxis(viewModel, "HighVacuumTime");
-        var valueAxis = viewModel.VacuumPlotModel.Axes.Single(axis => axis.Key == "HighVacuumValue");
+        var valueAxis = (LogarithmicAxis)viewModel.VacuumPlotModel.Axes.Single(axis => axis.Key == "HighVacuumValue");
         timeAxis.Zoom(
             DateTimeAxis.ToDouble(start.AddMinutes(5).LocalDateTime),
             DateTimeAxis.ToDouble(start.AddMinutes(10).LocalDateTime));
-        valueAxis.Zoom(-50d, 50d);
+        valueAxis.Zoom(1e-6d, 1e6d);
 
         viewModel.ResumeLiveFollowCommand.Execute(null);
 
@@ -172,9 +174,146 @@ public sealed class HistoryTrendViewModelTests
         Assert.True(double.IsNaN(valueAxis.Maximum));
         ((IPlotModel)viewModel.VacuumPlotModel).Update(updateData: true);
         Assert.InRange(13.6d, valueAxis.ActualMinimum, valueAxis.ActualMaximum);
-        Assert.True(
-            valueAxis.ActualMaximum - valueAxis.ActualMinimum < 20d,
-            $"Automatic range was {valueAxis.ActualMinimum}..{valueAxis.ActualMaximum}.");
+        Assert.True(valueAxis.ActualMaximum / valueAxis.ActualMinimum < 100d,
+            $"Automatic logarithmic range was {valueAxis.ActualMinimum}..{valueAxis.ActualMaximum}.");
+    }
+
+    [Fact]
+    public void VacuumCurves_UseBaseTenLogarithmicAxesWithoutChangingOtherCurves()
+    {
+        var viewModel = CreateViewModel(new SessionTrendStore());
+        var vacuumAxes = viewModel.VacuumPlotModel.Axes
+            .OfType<LogarithmicAxis>()
+            .ToArray();
+        var vacuumSeries = viewModel.VacuumPlotModel.Series.OfType<LineSeries>().ToArray();
+        var powerSeries = viewModel.PowerPlotModel.Series.OfType<LineSeries>().ToArray();
+
+        Assert.Equal(2, vacuumAxes.Length);
+        Assert.All(vacuumAxes, axis => Assert.Equal(10d, axis.Base));
+        Assert.All(vacuumAxes, axis => Assert.Equal("0.00E+00", axis.StringFormat));
+        Assert.Equal("1.23E-04", 0.000123d.ToString(vacuumAxes[0].StringFormat, CultureInfo.InvariantCulture));
+        Assert.All(vacuumSeries, series => Assert.Contains("数值: {4:0.00E+00}", series.TrackerFormatString));
+        Assert.Empty(viewModel.PowerPlotModel.Axes.OfType<LogarithmicAxis>());
+        Assert.Empty(viewModel.TemperaturePlotModel.Axes.OfType<LogarithmicAxis>());
+        Assert.All(powerSeries, series => Assert.Contains("数值: {4:0.###}", series.TrackerFormatString));
+        Assert.Contains("数值: {4:0.###}", ((LineSeries)viewModel.TemperaturePlotModel.Series.Single()).TrackerFormatString);
+    }
+
+    [Fact]
+    public void VacuumCurves_UseGapsForNonPositiveOrInvalidReadingsWithoutChangingStoredSamples()
+    {
+        var store = new SessionTrendStore();
+        var viewModel = CreateViewModel(store);
+        var start = new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.FromHours(8));
+        var valid = CreateSample(start) with { HighVacuumPa = 1e-5d, FilmHighVacuumPa = 1e4d };
+        var invalid = CreateSample(start.AddSeconds(1)) with { HighVacuumPa = 0d, FilmHighVacuumPa = -1d };
+        var missing = CreateSample(start.AddSeconds(2)) with { HighVacuumPa = double.NaN, FilmHighVacuumPa = double.PositiveInfinity };
+
+        store.Append(valid);
+        store.Append(invalid);
+        store.Append(missing);
+
+        Assert.Equal(0d, store.Snapshot()[1].HighVacuumPa);
+        Assert.Equal(-1d, store.Snapshot()[1].FilmHighVacuumPa);
+        var series = viewModel.VacuumPlotModel.Series.OfType<LineSeries>().ToArray();
+        Assert.Equal(1e-5d, series[0].Points[0].Y);
+        Assert.Equal(1e4d, series[1].Points[0].Y);
+        Assert.All(series.SelectMany(line => line.Points.Skip(1)), point => Assert.True(double.IsNaN(point.Y)));
+
+        ((IPlotModel)viewModel.VacuumPlotModel).Update(updateData: true);
+        Assert.All(viewModel.VacuumPlotModel.Axes.OfType<LogarithmicAxis>(), axis =>
+        {
+            Assert.True(axis.ActualMinimum > 0d);
+            Assert.True(axis.ActualMaximum > axis.ActualMinimum);
+        });
+    }
+
+    [Fact]
+    public void RefreshCurrentChart_OnlyResetsTheSelectedChartAndPreservesExistingSamples()
+    {
+        var store = new SessionTrendStore();
+        var viewModel = CreateViewModel(store);
+        var start = DateTimeOffset.Now.AddMinutes(-5);
+        store.Append(CreateSample(start));
+
+        var powerAxis = GetTimeAxis(viewModel, "PowerTime");
+        var powerMinimum = powerAxis.ActualMinimum;
+        var powerMaximum = powerAxis.ActualMaximum;
+        viewModel.SelectedChartIndex = 0;
+        viewModel.RefreshCurrentChartCommand.Execute(null);
+
+        var refreshStart = GetTimeAxis(viewModel, "HighVacuumTime").ActualMinimum;
+        Assert.InRange(Math.Abs(refreshStart - DateTimeAxis.ToDouble(DateTime.Now)), 0d, TimeSpan.FromSeconds(2).TotalDays);
+        AssertClose(refreshStart + RefreshedLiveWindow.TotalDays, GetTimeAxis(viewModel, "HighVacuumTime").ActualMaximum);
+        AssertAllVacuumTimeAxes(viewModel, refreshStart, refreshStart + RefreshedLiveWindow.TotalDays);
+        AssertClose(powerMinimum, powerAxis.ActualMinimum);
+        AssertClose(powerMaximum, powerAxis.ActualMaximum);
+        Assert.Single(GetHighVacuumSeries(viewModel).Points);
+
+        var latest = DateTimeOffset.Now.AddMinutes(10).AddSeconds(1);
+        store.Append(CreateSample(latest));
+        var latestValue = DateTimeAxis.ToDouble(latest.LocalDateTime);
+        AssertClose(latestValue - RefreshedLiveWindow.TotalDays, GetTimeAxis(viewModel, "HighVacuumTime").ActualMinimum);
+        AssertClose(latestValue + RefreshedLiveWindow.TotalDays * 0.02d, GetTimeAxis(viewModel, "HighVacuumTime").ActualMaximum);
+        Assert.NotEqual(GetTimeAxis(viewModel, "HighVacuumTime").ActualMinimum, powerAxis.ActualMinimum);
+    }
+
+    [Theory]
+    [InlineData(0, "HighVacuumTime", "FilmVacuumTime")]
+    [InlineData(1, "PowerTime")]
+    [InlineData(2, "TemperatureTime")]
+    public void RefreshCurrentChart_ResetsOnlyTheSelectedTab(int selectedIndex, params string[] refreshedAxisKeys)
+    {
+        var store = new SessionTrendStore();
+        var viewModel = CreateViewModel(store);
+        store.Append(CreateSample(DateTimeOffset.Now.AddMinutes(-5)));
+        var before = GetAllTimeAxes(viewModel).ToDictionary(axis => axis.Key!, axis => (axis.ActualMinimum, axis.ActualMaximum));
+
+        viewModel.SelectedChartIndex = selectedIndex;
+        viewModel.RefreshCurrentChartCommand.Execute(null);
+
+        foreach (var axis in GetAllTimeAxes(viewModel))
+        {
+            if (refreshedAxisKeys.Contains(axis.Key))
+            {
+                Assert.InRange(
+                    axis.ActualMaximum - axis.ActualMinimum,
+                    RefreshedLiveWindow.TotalDays - 0.00000001d,
+                    RefreshedLiveWindow.TotalDays + 0.00000001d);
+            }
+            else
+            {
+                AssertClose(before[axis.Key!].ActualMinimum, axis.ActualMinimum);
+                AssertClose(before[axis.Key!].ActualMaximum, axis.ActualMaximum);
+            }
+        }
+    }
+
+    [Fact]
+    public void RefreshCurrentChart_ContinuesOnlyTheRefreshedChartAfterGlobalFollowIsPaused()
+    {
+        var store = new SessionTrendStore();
+        var viewModel = CreateViewModel(store);
+        var start = DateTimeOffset.Now.AddMinutes(-5);
+        store.Append(CreateSample(start));
+        store.Append(CreateSample(start.AddMinutes(1)));
+
+        var powerAxis = GetTimeAxis(viewModel, "PowerTime");
+        powerAxis.Zoom(
+            DateTimeAxis.ToDouble(start.AddSeconds(10).LocalDateTime),
+            DateTimeAxis.ToDouble(start.AddSeconds(20).LocalDateTime));
+        var pausedPowerMinimum = powerAxis.ActualMinimum;
+        var pausedPowerMaximum = powerAxis.ActualMaximum;
+        Assert.False(viewModel.IsAutoFollow);
+
+        viewModel.SelectedChartIndex = 0;
+        viewModel.RefreshCurrentChartCommand.Execute(null);
+        var refreshedVacuumMinimum = GetTimeAxis(viewModel, "HighVacuumTime").ActualMinimum;
+        store.Append(CreateSample(DateTimeOffset.Now.AddSeconds(1)));
+
+        AssertClose(pausedPowerMinimum, powerAxis.ActualMinimum);
+        AssertClose(pausedPowerMaximum, powerAxis.ActualMaximum);
+        AssertClose(refreshedVacuumMinimum, GetTimeAxis(viewModel, "HighVacuumTime").ActualMinimum);
     }
 
     [Fact]
@@ -217,6 +356,18 @@ public sealed class HistoryTrendViewModelTests
             .Concat(viewModel.PowerPlotModel.Axes)
             .Concat(viewModel.TemperaturePlotModel.Axes)
             .OfType<DateTimeAxis>();
+
+    private static void AssertAllVacuumTimeAxes(
+        LiveTrendViewModel viewModel,
+        double expectedMinimum,
+        double expectedMaximum)
+    {
+        foreach (var axis in viewModel.VacuumPlotModel.Axes.OfType<DateTimeAxis>())
+        {
+            AssertClose(expectedMinimum, axis.ActualMinimum);
+            AssertClose(expectedMaximum, axis.ActualMaximum);
+        }
+    }
 
     private static void AssertAllTimeAxes(
         LiveTrendViewModel viewModel,

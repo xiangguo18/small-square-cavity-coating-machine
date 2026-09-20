@@ -155,8 +155,12 @@ public sealed class EquipmentFeatureTests
                 45 => (23, true), 46 => (23, false), _ => (-1, false)
             };
             if (feedback.Part >= 0)
-                Values[EquipmentGroups.PartState].SetValue(
-                    feedback.Open ? (ushort)2 : (ushort)1, feedback.Part);
+                Values[EquipmentGroups.PartState].SetValue(feedback.Part switch
+                {
+                    0 => feedback.Open ? (ushort)2 : (ushort)0,
+                    1 => feedback.Open ? (ushort)1 : (ushort)0,
+                    _ => feedback.Open ? (ushort)2 : (ushort)1
+                }, feedback.Part);
         }
         private void ApplySystemFeedback(string group, object value)
         {
@@ -170,6 +174,7 @@ public sealed class EquipmentFeatureTests
                 "EQ_Start" => ("fbButtonStart_Output", 33),
                 "EQ_Stop" => ("fbButtonStop_Output", 34),
                 "EQ_Reset" => ("fbButtonReset_Output", 35),
+                "EQ_BuzzerDisable" => ("fbButtonBuzzerDisable_Output", -1),
                 _ => ("", -1)
             };
             if (output.Length > 0 && Scalars.ContainsKey(output))

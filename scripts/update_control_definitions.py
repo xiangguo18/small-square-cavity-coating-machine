@@ -137,7 +137,7 @@ def main() -> None:
                     (1, "Speed", "分子泵转速", "RW", "Part_Data1[0]", "Part_Data_Set1[0]", 0, 100, "%", 0),
                     (2, "Opening", "APC阀开度", "RW", "Part_Data1[1]", "Part_Data_Set1[1]", 0, 100, "%", 1),
                     (3, "Temperature", "加热温度", "RW", "Part_Data1[2]", "Part_Data_Set1[2]", 0, 650, "℃", 2),
-                    (4, "Speed", "样品台转速", "RW", "Part_Data1[3]", "Part_Data_Set2[2]", 0, 500, "rpm", 3),
+                    (4, "Speed", "样品台转速", "RW", "Part_Data1[3]", "Part_Data_Set2[2]", 0, 50, "rpm", 3),
                     (4, "UnusedPosition1", "未使用位置1", "R", "Part_Data1[4]", "", -5000, 5000, "mm", 4),
                     (5, "UnusedSpeed2", "未使用速度2", "R", "Part_Data1[5]", "", 0, 500, "mm/s", 5),
                     (5, "UnusedPosition2", "未使用位置2", "R", "Part_Data1[6]", "", -5000, 5000, "mm", 6),
@@ -157,6 +157,7 @@ def main() -> None:
                     (23, "CloseTime", "放气阀关闭时间", "R", "Part_Data1[20]", "", 0, 10, "s", 20),
                 ],
             )
+            connection.execute("UPDATE MultiRecipeDef SET MaxValue=50 WHERE rowid=6")
             power_data = [
                 (21, 6, "Power", "直流功率", "RW", "Part_Data1[21]", "Part_Data_Set2[0]", 0, 50000, "W"),
                 (22, 6, "Voltage", "直流电压", "R", "Part_Data1[22]", "", 0, 1000, "V"),
@@ -178,6 +179,7 @@ def main() -> None:
                 ("Start", "系统开启", "EQ_Start", "EQ_Start_En", "Part_State[33]", 0),
                 ("Stop", "系统停止", "EQ_Stop", "EQ_Stop_En", "Part_State[34]", 0),
                 ("Reset", "系统复位", "EQ_Reset", "EQ_Reset_En", "Part_State[35]", 0),
+                ("BuzzerDisable", "蜂鸣器", "EQ_BuzzerDisable", "", "fbButtonBuzzerDisable_Output", 0),
                 ("PassInterlock", "互锁解除", "EQ_PassInterlock", "", "EQ_PassInterlock", 1),
             ]
             connection.execute("DELETE FROM SystemCommandDef")

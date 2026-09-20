@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Small_square_cavity_coating_machine.Models.Alarms;
 using Small_square_cavity_coating_machine.Models.History;
 using Small_square_cavity_coating_machine.Services.Alarms;
+using Small_square_cavity_coating_machine.Services.Equipment;
 using Small_square_cavity_coating_machine.Services.History;
 using System.Collections.ObjectModel;
 
@@ -20,6 +22,7 @@ public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase, IDi
 {
     private readonly IAlarmLogRepository _repository;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IEquipmentControlService? _controlService;
     private readonly HashSet<Guid> _known = [];
     private readonly HashSet<Guid> _queryIds = [];
     private readonly HashSet<Guid> _liveIds = [];
@@ -28,13 +31,19 @@ public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase, IDi
     private bool _disposed;
 
     public AlarmHistoryViewModel(IAlarmLogRepository repository, IUiDispatcher dispatcher,
-        AlarmSimulationViewModel? simulation = null)
+        AlarmSimulationViewModel? simulation = null, IEquipmentControlService? controlService = null)
     {
         _repository = repository;
         _dispatcher = dispatcher;
+        _controlService = controlService;
         Simulation = simulation;
         repository.RecordChanged += OnRecordChanged;
         repository.StorageStatusChanged += OnStorageChanged;
+        if (_controlService is not null)
+        {
+            _controlService.Changed += OnControlChanged;
+            UpdateBuzzerFeedback();
+        }
         ReturnToLive();
         StorageError = repository.StorageError;
     }
@@ -46,6 +55,7 @@ public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase, IDi
     [NotifyPropertyChangedFor(nameof(ModeText))]
     private bool isLiveMode = true;
     [ObservableProperty] private string storageError = string.Empty;
+    [ObservableProperty] private bool buzzerIsDisabled;
     public string ModeText => IsLiveMode ? "实时模式" : "历史模式（同时接收新报警）";
 
     [RelayCommand]
@@ -63,6 +73,31 @@ public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase, IDi
     {
         IsLiveMode = true;
         ResetRecords();
+    }
+
+    [RelayCommand]
+    private void ToggleBuzzer()
+    {
+        if (_controlService is null)
+        {
+            return;
+        }
+
+        var service = _controlService;
+        _ = Task.Run(async () =>
+        {
+            // 蜂鸣器沿用手动模式的“写 true、反馈决定灯态”协议，但不要求 HMI 登录控制权限。
+            await service.ExecuteSystemCommandAsync("BuzzerDisable", skipAuthorization: true).ConfigureAwait(false);
+        });
+    }
+
+    private void OnControlChanged(object? sender, EventArgs args) =>
+        _dispatcher.Post(() => { if (!_disposed) UpdateBuzzerFeedback(); });
+
+    private void UpdateBuzzerFeedback()
+    {
+        var point = _controlService?.Point("fbButtonBuzzerDisable_Output");
+        BuzzerIsDisabled = point is { Quality: AlarmQuality.Good, Value: true };
     }
 
     private void ResetRecords()
@@ -127,5 +162,9 @@ public sealed partial class AlarmHistoryViewModel : HistoryLogViewModelBase, IDi
         _disposed = true;
         _repository.RecordChanged -= OnRecordChanged;
         _repository.StorageStatusChanged -= OnStorageChanged;
+        if (_controlService is not null)
+        {
+            _controlService.Changed -= OnControlChanged;
+        }
     }
 }

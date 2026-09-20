@@ -188,7 +188,9 @@ public sealed class AlarmWpfPresentationTests
             Assert.All(mfcControls, control => Assert.NotNull(control.SetpointCommand));
             Assert.All(mfcControls, control =>
                 Assert.Single(Descendants<TextBox>(control), box => box.Name == "SetpointTextBox"));
-            Assert.Contains(Descendants<SampleStageSpeedControl>(controlPage), c => c.ShowStatusIndicator);
+            var speedControls = Descendants<SampleStageSpeedControl>(controlPage).ToArray();
+            Assert.Single(speedControls);
+            Assert.True(speedControls[0].ShowStatusIndicator);
             Assert.Equal(64, io.Rows.Count); Assert.Equal(21, parameters.Rows.Count);
             Assert.All(parameters.Rows, r => { Assert.Equal("—", r.CurrentText); Assert.False(r.CanEdit); });
             Task.Run(h.Start).GetAwaiter().GetResult(); Pump();

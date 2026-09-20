@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Small_square_cavity_coating_machine"
         mc:Ignorable="d"
-        Title="MainWindow" Height="750" Width="1200">
+        Title="单腔室磁控溅射镀膜机" Height="750" Width="1200">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto"/>
@@ -39,7 +39,8 @@
             <ToggleButton Grid.Row="1" 
                           Content="&#xF039;" 
                           FontSize="30" 
-                          FontFamily="Font Awesome 5 Free Solid" 
+                          FontFamily="../Resources/Fonts/#Font Awesome 5 Free"
+                          FontWeight="Black"
                           Background="LightBlue"
                           BorderThickness="0"
                           BorderBrush="Transparent">

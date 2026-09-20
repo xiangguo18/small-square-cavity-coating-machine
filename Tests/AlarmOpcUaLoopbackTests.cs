@@ -37,7 +37,7 @@ public sealed class AlarmOpcUaLoopbackTests
         private BaseDataVariableState<float[]> _process = null!;
         private FolderState _folder = null!;
         private BaseDataVariableState<float[]> _recipe = null!;
-        private BaseDataVariableState<bool> _recipeOk = null!, _coatOk = null!;
+        private BaseDataVariableState<bool> _recipeOk = null!, _coatOk = null!, _recipeLoad = null!;
         public float[] RecipeValues { get { lock (Lock) return _recipe.Value.ToArray(); } }
         public bool RejectRecipeRange;
         public readonly ConcurrentQueue<string> RecipeOperations = new();
@@ -60,6 +60,7 @@ public sealed class AlarmOpcUaLoopbackTests
             foreach (var write in nodesToWrite)
             {
                 if (write.NodeId == _recipe.NodeId) RecipeOperations.Enqueue("write:array:" + write.IndexRange);
+                if (write.NodeId == _recipeLoad.NodeId) RecipeOperations.Enqueue("write:load:" + write.Value.Value);
                 if (write.NodeId == _coatOk.NodeId) RecipeOperations.Enqueue("write:coat:" + write.Value.Value);
                 if (write.NodeId == _recipeOk.NodeId)
                 {
@@ -179,14 +180,15 @@ public sealed class AlarmOpcUaLoopbackTests
                     DataType = DataTypeIds.Float, ValueRank = ValueRanks.OneDimension, ArrayDimensions = new uint[] {200},
                     AccessLevel = AccessLevels.CurrentReadOrWrite, UserAccessLevel = AccessLevels.CurrentReadOrWrite,
                     Value = Enumerable.Repeat(99f, 200).ToArray(), StatusCode = StatusCodes.Good, Timestamp = DateTime.UtcNow };
-                BaseDataVariableState<bool> Flag(string browse, bool initial) => new(folder) {
+                BaseDataVariableState<bool> Flag(string browse, bool initial, bool writeOnly = false) => new(folder) {
                     NodeId = new NodeId("vendor." + browse, NamespaceIndex), BrowseName = new QualifiedName(browse, NamespaceIndex),
                     DisplayName = browse, ReferenceTypeId = ReferenceTypeIds.HasComponent, TypeDefinitionId = VariableTypeIds.BaseDataVariableType,
                     DataType = DataTypeIds.Boolean, ValueRank = ValueRanks.Scalar,
-                    AccessLevel = AccessLevels.CurrentReadOrWrite, UserAccessLevel = AccessLevels.CurrentReadOrWrite,
+                    AccessLevel = writeOnly ? AccessLevels.CurrentWrite : AccessLevels.CurrentReadOrWrite,
+                    UserAccessLevel = writeOnly ? AccessLevels.CurrentWrite : AccessLevels.CurrentReadOrWrite,
                     Value = initial, StatusCode = StatusCodes.Good, Timestamp = DateTime.UtcNow };
-                _recipeOk = Flag("EQ_RecipeOK", false); _coatOk = Flag("EQ_CoatOK", true);
-                folder.AddChild(_recipe); folder.AddChild(_recipeOk); folder.AddChild(_coatOk);
+                _recipeOk = Flag("EQ_RecipeOK", false); _coatOk = Flag("EQ_CoatOK", true); _recipeLoad = Flag("EQ_Recipe1Load", false, writeOnly: true);
+                folder.AddChild(_recipe); folder.AddChild(_recipeOk); folder.AddChild(_coatOk); folder.AddChild(_recipeLoad);
                 AddPredefinedNode(SystemContext, folder);
             }
         }
@@ -314,8 +316,9 @@ public sealed class AlarmOpcUaLoopbackTests
             Assert.Contains("PLC实际数组长度=200", run.Notice);
             Assert.Contains("最终发送载荷长度=200", run.Notice);
             var recipeWrites = server.Nodes.Writes.ToArray();
-            Assert.Equal(6, recipeWrites.Length);
-            Assert.Equal("vendor.EQ_CoatOK", recipeWrites[0].Node.Identifier); Assert.False((bool)recipeWrites[0].Value);
+            Assert.Equal(7, recipeWrites.Length);
+            Assert.Equal("vendor.EQ_Recipe1Load", recipeWrites[0].Node.Identifier); Assert.True((bool)recipeWrites[0].Value);
+            Assert.Equal("vendor.EQ_CoatOK", recipeWrites[1].Node.Identifier); Assert.False((bool)recipeWrites[1].Value);
             Assert.Equal("vendor.EQ_CoatOK", recipeWrites[^1].Node.Identifier); Assert.True((bool)recipeWrites[^1].Value);
             foreach (var item in recipeWrites.Where(w => w.Node.Identifier.Equals("vendor.recipe.block")))
             {
@@ -338,7 +341,7 @@ public sealed class AlarmOpcUaLoopbackTests
             server.Nodes.RejectRecipeRange = true; server.Nodes.Writes.Clear();
             var rejectedRecipe = await dispatch.RunAsync(new(RecipeDispatchMode.All, [new RecipeLayer { Sequence = 1 }], "序号1"),
                 new Progress<RecipeRunProgress>(), deadline.Token);
-            Assert.False(rejectedRecipe.IsCompleted); Assert.Equal(2, server.Nodes.Writes.Count);
+            Assert.False(rejectedRecipe.IsCompleted); Assert.Equal(3, server.Nodes.Writes.Count);
             Assert.DoesNotContain(server.Nodes.Writes, w => w.Node.Identifier.Equals("vendor.EQ_RecipeOK"));
             Assert.True(string.IsNullOrEmpty(server.Nodes.Writes.Last().Range));
             Assert.All(server.Nodes.RecipeValues.Skip(18), v => Assert.Equal(99f, v));

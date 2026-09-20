@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Globalization;
 using Small_square_cavity_coating_machine.Models.Alarms;
 using Small_square_cavity_coating_machine.Models.Equipment;
 using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Controls;
 using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.Equipment;
 using Small_square_cavity_coating_machine.Services.History;
@@ -52,6 +54,12 @@ public partial class ControlViewModel : IDisposable
 
     [ObservableProperty] private bool dryPumpIsFaulted;
     [ObservableProperty] private bool turboPumpIsFaulted;
+    [ObservableProperty] private bool dryPumpStateKnown;
+    [ObservableProperty] private bool turboPumpStateKnown;
+    [ObservableProperty] private int? dryPumpRawState;
+    [ObservableProperty] private int? turboPumpRawState;
+    [ObservableProperty] private PumpVisualState dryPumpVisualState;
+    [ObservableProperty] private PumpVisualState turboPumpVisualState;
     [ObservableProperty] private bool apcIsFaulted;
     [ObservableProperty] private bool heaterIsFaulted;
     [ObservableProperty] private bool bypassValveIsFaulted;
@@ -74,7 +82,14 @@ public partial class ControlViewModel : IDisposable
     [ObservableProperty] private bool filmGaugeValveIsFaulted;
 
     [ObservableProperty]
-    private double turboPumpCurrentSpeed;
+    private double turboPumpCurrentSpeed = double.NaN;
+
+    public string TurboPumpSpeedDisplay => double.IsFinite(TurboPumpCurrentSpeed)
+        ? TurboPumpCurrentSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " %"
+        : "-- %";
+
+    partial void OnTurboPumpCurrentSpeedChanged(double value) =>
+        OnPropertyChanged(nameof(TurboPumpSpeedDisplay));
 
     [ObservableProperty]
     private double turboPumpSetpointSpeed;
@@ -106,8 +121,8 @@ public partial class ControlViewModel : IDisposable
 
     private void ApplySnapshot(EquipmentSnapshot snapshot)
     {
-        var dryPump = State(snapshot, 0);
-        var turboPump = State(snapshot, 1);
+        var dryPump = DryPumpState(snapshot);
+        var turboPump = TurboPumpState(snapshot);
         var apc = State(snapshot, 2);
         var heater = State(snapshot, 3);
         var sampleStage = State(snapshot, 4);
@@ -154,10 +169,16 @@ public partial class ControlViewModel : IDisposable
         Power2IsFaulted = power2.Fault;
         SampleStageIsRunning = sampleStage.Open;
         SampleStageIsFaulted = sampleStage.Fault;
-        DryPumpIsRunning = dryPump.Open;
-        DryPumpIsFaulted = dryPump.Fault;
-        TurboPumpIsRunning = turboPump.Open;
-        TurboPumpIsFaulted = turboPump.Fault;
+        DryPumpRawState = dryPump.RawState;
+        DryPumpStateKnown = dryPump.Known;
+        DryPumpIsRunning = dryPump.Running;
+        DryPumpIsFaulted = dryPump.Faulted;
+        DryPumpVisualState = dryPump.VisualState;
+        TurboPumpRawState = turboPump.RawState;
+        TurboPumpStateKnown = turboPump.Known;
+        TurboPumpIsRunning = turboPump.Running;
+        TurboPumpIsFaulted = turboPump.Faulted;
+        TurboPumpVisualState = turboPump.VisualState;
         HeaterIsRunning = heater.Open;
         HeaterIsFaulted = heater.Fault;
         ApcIsOpen = apc.Open;
@@ -280,6 +301,53 @@ public partial class ControlViewModel : IDisposable
         }
     }
 
+    /// <summary>干泵采用 PLC 数值状态：0 停机、2 运行、6 运行告警闪烁；其他值不驱动启停。</summary>
+    private static (int? RawState, bool Known, bool Running, bool Faulted, PumpVisualState VisualState) DryPumpState(
+        EquipmentSnapshot snapshot)
+    {
+        var raw = RawState(snapshot, 0);
+        return raw switch
+        {
+            0 => (raw, true, false, false, PumpVisualState.Idle),
+            2 => (raw, true, true, false, PumpVisualState.Green),
+            6 => (raw, true, true, false, PumpVisualState.GreenBlink),
+            _ => (raw, false, false, raw is not null && (raw.Value & (1 << 7)) != 0, PumpVisualState.Idle)
+        };
+    }
+
+    /// <summary>分子泵采用 PLC 数值状态机，非零状态均由现场约定为非停机状态。</summary>
+    private static (int? RawState, bool Known, bool Running, bool Faulted, PumpVisualState VisualState) TurboPumpState(
+        EquipmentSnapshot snapshot)
+    {
+        var raw = RawState(snapshot, 1);
+        return raw switch
+        {
+            0 => (raw, true, false, false, PumpVisualState.Idle),
+            1 => (raw, true, true, false, PumpVisualState.Green),
+            2 => (raw, true, true, false, PumpVisualState.Yellow),
+            3 => (raw, true, true, false, PumpVisualState.Yellow),
+            4 => (raw, true, true, true, PumpVisualState.Red),
+            5 => (raw, true, true, false, PumpVisualState.GreenBlink),
+            6 => (raw, true, true, false, PumpVisualState.YellowBlink),
+            _ => (raw, false, false, false, PumpVisualState.Idle)
+        };
+    }
+
+    private static int? RawState(EquipmentSnapshot snapshot, int index)
+    {
+        var point = Point(snapshot, $"Part_State[{index}]");
+        if (point is not { Quality: AlarmQuality.Good } || point.Value is null) return null;
+        try
+        {
+            var value = Convert.ToInt32(point.Value);
+            return value >= 0 ? value : null;
+        }
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+        {
+            return null;
+        }
+    }
+
     private static EquipmentPoint? Point(EquipmentSnapshot snapshot, string address)
     {
         var group = EquipmentAddress.Group(address);
@@ -316,9 +384,15 @@ public partial class ControlViewModel : IDisposable
 
     private bool Requested(string key) => _requestedStates.GetValueOrDefault(key);
 
-    private bool TryQueuePartToggle(string key, bool feedbackOpen, int openId, int closeId, string target)
+    private bool TryQueuePartToggle(string key, bool feedbackOpen, int openId, int closeId, string target,
+        bool stateKnown = true)
     {
         if (_controlService is null) return false;
+        if (!stateKnown)
+        {
+            ControlStatusText = $"{target}状态值未知，未发送启停命令";
+            return true;
+        }
         var knownFeedback = _controlService.Definitions.Commands.GetValueOrDefault(openId) is { PartId: var partId }
             && _controlService.Definitions.Parts.GetValueOrDefault(partId)?.StateAddress is { Length: > 0 };
         var current = knownFeedback ? feedbackOpen : Requested(key);

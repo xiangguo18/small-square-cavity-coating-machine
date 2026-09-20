@@ -14,6 +14,13 @@ public abstract class PumpControlBase : DeviceButtonBase
             typeof(PumpControlBase),
             new FrameworkPropertyMetadata(false));
 
+    public static readonly DependencyProperty VisualStateProperty =
+        DependencyProperty.Register(
+            nameof(VisualState),
+            typeof(PumpVisualState),
+            typeof(PumpControlBase),
+            new FrameworkPropertyMetadata(PumpVisualState.Idle));
+
     public static readonly DependencyProperty LabelPlacementProperty =
         DependencyProperty.Register(
             nameof(LabelPlacement),
@@ -25,6 +32,15 @@ public abstract class PumpControlBase : DeviceButtonBase
     {
         get => (bool)GetValue(IsRunningProperty);
         set => SetValue(IsRunningProperty, value);
+    }
+
+    /// <summary>
+    /// 由 PLC 状态字映射出的图标颜色与闪烁状态，不作为设备运行判据。
+    /// </summary>
+    public PumpVisualState VisualState
+    {
+        get => (PumpVisualState)GetValue(VisualStateProperty);
+        set => SetValue(VisualStateProperty, value);
     }
 
     public PumpLabelPlacement LabelPlacement

@@ -13,7 +13,8 @@ public interface IEquipmentControlService
     Task<ControlWriteResult> ExecutePartCommandAsync(int id, string target, string action, CancellationToken token = default);
     Task<ControlWriteResult> ExecutePartCommandBatchAsync(int assertId, IReadOnlyList<int> deassertIds,
         string target, string action, CancellationToken token = default);
-    Task<ControlWriteResult> ExecuteSystemCommandAsync(string name, CancellationToken token = default);
+    Task<ControlWriteResult> ExecuteSystemCommandAsync(string name, bool skipAuthorization = false,
+        CancellationToken token = default);
     Task<ControlWriteResult> WriteSystemCommandAsync(string name, bool value, string target, string action,
         CancellationToken token = default);
     Task<ControlWriteResult> WriteSetpointAsync(int partDataId, double value, PermissionKey permission,
@@ -54,20 +55,24 @@ public sealed class EquipmentControlService : IEquipmentControlService, IDisposa
             && !GoodBoolean(snapshot, EquipmentGroups.PassInterlock)
             && !GoodBoolean(snapshot, command.InterlockAddress))
             return new(ControlWriteOutcome.Rejected, $"{target}{action}互锁条件未满足");
-        var (confirm, stateAddress, expectOpen) = ConfirmationFor(command);
+        var (confirm, stateAddress, expectOpen, profile) = ConfirmationFor(command);
         return await _client.WriteControlAsync(new(command.Address, true, snapshot.Epoch, target, action,
-            PermissionKey.SystemStatus, Confirm: confirm, StateAddress: stateAddress, ExpectOpen: expectOpen),
+            PermissionKey.SystemStatus, Confirm: confirm, StateAddress: stateAddress, ExpectOpen: expectOpen,
+            StateConfirmationProfile: profile),
             token).ConfigureAwait(false);
     }
 
-    public async Task<ControlWriteResult> ExecuteSystemCommandAsync(string name, CancellationToken token = default)
+    public async Task<ControlWriteResult> ExecuteSystemCommandAsync(string name, bool skipAuthorization = false,
+        CancellationToken token = default)
     {
         if (!Definitions.SystemCommands.TryGetValue(name, out var command))
             return new(ControlWriteOutcome.Rejected, $"数据库未定义系统命令{name}");
+        if (skipAuthorization && !string.Equals(name, "BuzzerDisable", StringComparison.Ordinal))
+            return new(ControlWriteOutcome.Rejected, "仅蜂鸣器允许免登录权限写入");
         var snapshot = _client.Snapshot();
         return await _client.WriteControlAsync(new(command.CommandAddress, true, snapshot.Epoch,
             "系统控制", command.DisplayName, PermissionKey.SystemStatus, command.RequiresBuiltInAdministrator,
-            Confirm: ControlConfirm.Sent), token).ConfigureAwait(false);
+            SkipAuthorization: skipAuthorization, Confirm: ControlConfirm.Sent), token).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -84,7 +89,7 @@ public sealed class EquipmentControlService : IEquipmentControlService, IDisposa
             && !GoodBoolean(snapshot, EquipmentGroups.PassInterlock)
             && !GoodBoolean(snapshot, command.InterlockAddress))
             return new(ControlWriteOutcome.Rejected, $"{target}{action}互锁条件未满足");
-        var (confirm, stateAddress, expectOpen) = ConfirmationFor(command);
+        var (confirm, stateAddress, expectOpen, profile) = ConfirmationFor(command);
         var deasserts = new List<ArrayWriteMutation>(deassertIds?.Count ?? 0);
         if (deassertIds is not null)
             foreach (var id in deassertIds)
@@ -95,6 +100,7 @@ public sealed class EquipmentControlService : IEquipmentControlService, IDisposa
             }
         return await _client.WriteControlAsync(new(command.Address, true, snapshot.Epoch, target, action,
             PermissionKey.SystemStatus, Confirm: confirm, StateAddress: stateAddress, ExpectOpen: expectOpen,
+            StateConfirmationProfile: profile,
             ArrayMutations: deasserts), token).ConfigureAwait(false);
     }
 
@@ -142,15 +148,21 @@ public sealed class EquipmentControlService : IEquipmentControlService, IDisposa
         { Quality: AlarmQuality.Good, Value: true };
     }
 
-    private (ControlConfirm Confirm, string? StateAddress, bool ExpectOpen) ConfirmationFor(
+    private (ControlConfirm Confirm, string? StateAddress, bool ExpectOpen, PartStateConfirmationProfile Profile) ConfirmationFor(
         PartCommandDefinition command)
     {
         var stateAddress = Definitions.Parts.GetValueOrDefault(command.PartId)?.StateAddress;
         var hasState = !string.IsNullOrWhiteSpace(stateAddress)
             && command.Command is "Open" or "Close" or "Start" or "Stop";
+        var profile = command.PartId switch
+        {
+            0 => PartStateConfirmationProfile.DryPump,
+            1 => PartStateConfirmationProfile.TurboPump,
+            _ => PartStateConfirmationProfile.Generic
+        };
         return hasState
-            ? (ControlConfirm.State, stateAddress, command.Command is "Open" or "Start")
-            : (ControlConfirm.Sent, null, false);
+            ? (ControlConfirm.State, stateAddress, command.Command is "Open" or "Start", profile)
+            : (ControlConfirm.Sent, null, false, PartStateConfirmationProfile.Generic);
     }
 
     private void ClientSnapshotChanged(object? sender, EventArgs e) => Changed?.Invoke(this, EventArgs.Empty);

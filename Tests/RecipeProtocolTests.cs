@@ -16,7 +16,7 @@ public sealed class RecipeProtocolTests
     {
         public readonly EquipmentFeatureTests.Session Base = new();
         public Array Recipe = Enumerable.Repeat(77f, 24).ToArray();
-        public object RecipeOk = true, CoatOk = true;
+        public object RecipeOk = true, CoatOk = true, RecipeLoad = false;
         public bool AutoComplete = true, FastComplete, SuppressZero, Mismatch, FailFinal, Missing, ReadOnly;
         public readonly ConcurrentQueue<string> Calls = new();
         public readonly ConcurrentQueue<(string Group, object Value)> Writes = new();
@@ -27,12 +27,13 @@ public sealed class RecipeProtocolTests
         public async Task<IReadOnlyDictionary<string, EquipmentBinding>> DiscoverAsync(CancellationToken token)
         {
             var result = new Dictionary<string, EquipmentBinding>(await Base.DiscoverAsync(token));
-            foreach (var group in EquipmentGroups.RecipePoints)
+            foreach (var group in EquipmentGroups.RecipeWritePoints)
                 result[group] = new(group, !Missing, !ReadOnly, group == EquipmentGroups.Recipe ? Recipe.GetType().GetElementType()
-                    : (group == EquipmentGroups.RecipeOk ? RecipeOk : CoatOk).GetType(), Missing ? "缺失配方节点" : "");
+                    : (group == EquipmentGroups.RecipeOk ? RecipeOk : group == EquipmentGroups.CoatOk ? CoatOk : RecipeLoad).GetType(), Missing ? "缺失配方节点" : "");
             return result;
         }
-        private DataValue Value(string group) => new(new Variant(group == EquipmentGroups.Recipe ? Recipe.Clone() : group == EquipmentGroups.RecipeOk ? RecipeOk : CoatOk))
+        private DataValue Value(string group) => new(new Variant(group == EquipmentGroups.Recipe ? Recipe.Clone()
+            : group == EquipmentGroups.RecipeOk ? RecipeOk : group == EquipmentGroups.CoatOk ? CoatOk : RecipeLoad))
             { SourceTimestamp = _stamp };
         public async Task<DataValue> ReadGroupAsync(string group, int? index, CancellationToken token)
         {
@@ -58,6 +59,10 @@ public sealed class RecipeProtocolTests
             {
                 if (FailFinal && System.Convert.ToBoolean(value)) throw new InvalidOperationException("完成标志拒绝");
                 CoatOk = value; Publish(group);
+            }
+            else if (group == EquipmentGroups.RecipeLoad)
+            {
+                RecipeLoad = value; Publish(group);
             }
             else if (group == EquipmentGroups.Recipe)
             {
@@ -125,9 +130,10 @@ public sealed class RecipeProtocolTests
         Assert.Contains("PLC实际数组长度=24", result.Notice);
         Assert.Contains("配方覆盖项数=18", result.Notice);
         Assert.Contains("最终发送载荷长度=24", result.Notice);
-        Assert.Equal(new[] { EquipmentGroups.CoatOk, EquipmentGroups.Recipe, EquipmentGroups.RecipeOk,
+        Assert.Equal(new[] { EquipmentGroups.RecipeLoad, EquipmentGroups.CoatOk, EquipmentGroups.Recipe, EquipmentGroups.RecipeOk,
             EquipmentGroups.Recipe, EquipmentGroups.RecipeOk, EquipmentGroups.CoatOk }, h.Session.Writes.Select(w => w.Group));
-        Assert.False((bool)h.Session.Writes.First().Value); Assert.True((bool)h.Session.Writes.Last().Value);
+        Assert.True((bool)h.Session.Writes.First().Value); Assert.False((bool)h.Session.Writes.ElementAt(1).Value); Assert.True((bool)h.Session.Writes.Last().Value);
+        Assert.DoesNotContain("read:" + EquipmentGroups.RecipeLoad, h.Session.Calls);
         Assert.All(h.Session.Writes.Where(w => w.Group == EquipmentGroups.RecipeOk), w => Assert.False((bool)w.Value));
         Assert.All(h.Session.Recipe.Cast<float>().Skip(18), x => Assert.Equal(77f, x));
         Assert.Equal(1, h.Session.Base.SubscribeCount);
@@ -166,19 +172,19 @@ public sealed class RecipeProtocolTests
     {
         await using var h = new Harness(new Session { AutoComplete = false }); await h.Start();
         var run = h.Run(new RecipeLayer { Sequence = 1 }, new RecipeLayer { Sequence = 2 });
-        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 3 && !h.Client.Snapshot().IsWriting);
+        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 4 && !h.Client.Snapshot().IsWriting);
         if (reason == "disconnect") h.Session.Base.Failure.TrySetException(new System.IO.IOException("断线"));
         if (reason == "quality") h.Session.Publish(EquipmentGroups.Recipe, StatusCodes.BadCommunicationError);
         if (reason == "permission") h.Definitions.Auth.SetAllowed(false);
         var result = await run.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.False(result.IsCompleted); Assert.Equal(3, h.Session.Writes.Count);
-        h.Session.Complete(); Assert.Equal(3, h.Session.Writes.Count);
+        Assert.False(result.IsCompleted); Assert.Equal(4, h.Session.Writes.Count);
+        h.Session.Complete(); Assert.Equal(4, h.Session.Writes.Count);
     }
     [Fact] public async Task Endpoint_locked_for_run_but_parameters_allowed_during_coating()
     {
         await using var h = new Harness(new Session { AutoComplete = false }); await h.Start();
         var run = h.Run(new RecipeLayer { Sequence = 1 });
-        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 3 && !h.Client.Snapshot().IsWriting);
+        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 4 && !h.Client.Snapshot().IsWriting);
         Assert.True(h.Client.IsWriteInProgress);
         await Assert.ThrowsAsync<InvalidOperationException>(() => h.Client.ApplyEndpointAsync("opc.tcp://127.0.0.1:4999"));
         var result = await h.Client.WriteParameterAsync(new("EQ_Parameter1[0]", "8", 5f, h.Client.Snapshot().Epoch));
@@ -202,23 +208,25 @@ public sealed class RecipeProtocolTests
     [Fact] public void Definitions_and_mapping_validate_new_ranges_types_and_unused_mode_zeroes()
     {
         var d = RecipeDefinitions.Default;
-        Assert.Equal(18, d.Count); Assert.Equal(120, d[3].Maximum); Assert.Equal(3600, d[6].Maximum); Assert.Equal(2, d[13].DefaultValue);
-        var layer = new RecipeLayer { Sequence = 1, IntervalSeconds = 120, CoatingSeconds = 3600, StageSpeedRpm = 500,
+        Assert.Equal(18, d.Count); Assert.Equal(120, d[3].Maximum); Assert.Equal(50, d[5].Maximum); Assert.Equal(3600, d[6].Maximum); Assert.Equal(2, d[13].DefaultValue);
+        var layer = new RecipeLayer { Sequence = 1, IntervalSeconds = 120, CoatingSeconds = 3600, StageSpeedRpm = 50,
             PressureControlMode = RecipePressureControlMode.Pressure, IgnitionPressurePa = 0.2, IgnitionApcPercent = 40 };
         var block = (float[])RecipeDefinitions.ConvertLayer(layer, typeof(float), d);
-        Assert.Equal(120, block[3]); Assert.Equal(3600, block[6]); Assert.Equal(500, block[5]); Assert.Equal(0.2f, block[14]); Assert.Equal(0, block[16]);
+        Assert.Equal(120, block[3]); Assert.Equal(3600, block[6]); Assert.Equal(50, block[5]); Assert.Equal(0.2f, block[14]); Assert.Equal(0, block[16]);
         Assert.Throws<InvalidOperationException>(() => RecipeDefinitions.ConvertLayer(layer, typeof(int), d));
         Assert.Throws<InvalidOperationException>(() => RecipeDefinitions.ConvertLayer(new RecipeLayer { Sequence = 1, StageSpeedRpm = -1 }, typeof(float), d));
+        Assert.Throws<InvalidOperationException>(() => RecipeDefinitions.ConvertLayer(new RecipeLayer { Sequence = 1, StageSpeedRpm = 51 }, typeof(float), d));
     }
     [Fact] public async Task Integer_flags_and_double_recipe_preserve_exact_types()
     {
-        await using var h = new Harness(new Session { Recipe = Enumerable.Repeat(77d,24).ToArray(), RecipeOk = 0, CoatOk = (short)1 });
+        await using var h = new Harness(new Session { Recipe = Enumerable.Repeat(77d,24).ToArray(), RecipeOk = 0, CoatOk = (short)1, RecipeLoad = (short)0 });
         await h.Start();
         var result = await h.Run(new RecipeLayer { Sequence = 1, IgnitionPressurePa = 0.2 });
         Assert.True(result.IsCompleted, result.FailureReason);
         Assert.IsType<double[]>(h.Session.Writes.Single(w => w.Group == EquipmentGroups.Recipe).Value);
         Assert.IsType<int>(h.Session.Writes.Single(w => w.Group == EquipmentGroups.RecipeOk).Value);
         Assert.All(h.Session.Writes.Where(w => w.Group == EquipmentGroups.CoatOk), w => Assert.IsType<short>(w.Value));
+        Assert.IsType<short>(h.Session.Writes.Single(w => w.Group == EquipmentGroups.RecipeLoad).Value);
     }
     [Fact] public async Task Exact_eighteen_float_recipe_reports_matching_payload_length()
     {
@@ -266,12 +274,12 @@ public sealed class RecipeProtocolTests
     {
         await using var h = new Harness(new Session { AutoComplete = false }); await h.Start();
         var run = h.Run(new RecipeLayer { Sequence = 1 });
-        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 3 && !h.Client.Snapshot().IsWriting);
+        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 4 && !h.Client.Snapshot().IsWriting);
         h.Definitions.Runtime.FailBegin = true; h.Session.Complete();
         var result = await run;
         Assert.False(result.IsCompleted); Assert.Equal(1,result.CompletedLayers);
         Assert.Contains("全部层已完成，完成标志未确认",result.FailureReason);
-        Assert.Equal(3,h.Session.Writes.Count);
+        Assert.Equal(4,h.Session.Writes.Count);
     }
 
     [Fact] public async Task Alarms_and_unknown_alarm_quality_do_not_add_an_unapproved_interlock()
@@ -287,11 +295,25 @@ public sealed class RecipeProtocolTests
         using var stop = new CancellationTokenSource();
         var run = h.Dispatch.RunAsync(new(RecipeDispatchMode.All, [new RecipeLayer { Sequence = 1 },new RecipeLayer { Sequence = 2 }], "1-2"),
             new Progress<RecipeRunProgress>(), stop.Token);
-        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 3);
+        await AlarmArrayConnectionTests.Until(() => h.Session.Writes.Count == 4);
         stop.Cancel();
         var result = await run;
         Assert.False(result.IsCompleted); Assert.Contains("不表示设备已停机",result.FailureReason);
-        Assert.Equal(3,h.Session.Writes.Count); Assert.False(h.Client.IsWriteInProgress);
+        Assert.Equal(4,h.Session.Writes.Count); Assert.False(h.Client.IsWriteInProgress);
+    }
+
+    [Fact] public async Task Recipe_load_write_failure_stops_before_coating_or_layer_writes()
+    {
+        var session = new Session();
+        session.Writing = (group, _, _) => group == EquipmentGroups.RecipeLoad
+            ? throw new InvalidOperationException("RecipeLoad拒绝") : Task.CompletedTask;
+        await using var h = new Harness(session); await h.Start();
+
+        var result = await h.Run(new RecipeLayer { Sequence = 1 });
+
+        Assert.False(result.IsCompleted);
+        Assert.Equal([EquipmentGroups.RecipeLoad], session.Writes.Select(write => write.Group));
+        Assert.DoesNotContain(session.Writes, write => write.Group is EquipmentGroups.CoatOk or EquipmentGroups.Recipe or EquipmentGroups.RecipeOk);
     }
     [Fact] public void Interrupted_run_snapshot_is_restored_only_as_history()
     {

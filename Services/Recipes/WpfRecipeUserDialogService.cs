@@ -13,9 +13,26 @@ public sealed class WpfRecipeUserDialogService(IReadOnlyList<RecipeDefinition>? 
         var dialog = new OpenFileDialog
         {
             Title = "导入工艺配方",
-            Filter = "Excel 配方文件 (*.xls;*.xlsx)|*.xls;*.xlsx|所有文件 (*.*)|*.*",
+            Filter = "配方文件 (*.csv;*.xls;*.xlsx)|*.csv;*.xls;*.xlsx|CSV 配方文件 (*.csv)|*.csv|Excel 配方文件 (*.xls;*.xlsx)|*.xls;*.xlsx|所有文件 (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false
+        };
+
+        return dialog.ShowDialog(Application.Current.MainWindow) == true
+            ? dialog.FileName
+            : null;
+    }
+
+    public string? SelectRecipeExportPath(string suggestedFileName)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出工艺配方",
+            Filter = "CSV 配方文件 (*.csv)|*.csv|所有文件 (*.*)|*.*",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = suggestedFileName
         };
 
         return dialog.ShowDialog(Application.Current.MainWindow) == true

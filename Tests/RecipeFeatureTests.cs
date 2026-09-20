@@ -54,9 +54,88 @@ public sealed class RecipeFeatureTests
         }
     }
 
+    [Fact]
+    public void RecipeCsv_ExportsAllColumnsWithBomAndRoundTripsThroughImport()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"recipe-export-{Guid.NewGuid():N}.csv");
+        var source = new[]
+        {
+            new RecipeLayer
+            {
+                Sequence = 1, CathodeAPower = 230d, CathodeBPower = 320d, PowerSpan = 15d,
+                IntervalSeconds = 2d, PreSputterSeconds = 30d, StageSpeedRpm = 50d, CoatingSeconds = 120d,
+                IgnitionArgonSccm = 12d, WorkingArgonSccm = 8d, IgnitionNitrogenSccm = 6d, WorkingNitrogenSccm = 4d,
+                IgnitionOxygenSccm = 3d, WorkingOxygenSccm = 2d, GasStabilizationSeconds = 2d,
+                IgnitionPressurePa = 1.2d, WorkingPressurePa = 0.8d, IgnitionApcPercent = 30d, WorkingApcPercent = 40d
+            },
+            new RecipeLayer
+            {
+                Sequence = 2, CathodeAPower = 240d, CathodeBPower = 330d, PowerSpan = 20d,
+                IntervalSeconds = 3d, PreSputterSeconds = 20d, StageSpeedRpm = 0d, CoatingSeconds = 180d,
+                IgnitionArgonSccm = 10d, WorkingArgonSccm = 7d, IgnitionNitrogenSccm = 5d, WorkingNitrogenSccm = 3d,
+                IgnitionOxygenSccm = 2d, WorkingOxygenSccm = 1d, GasStabilizationSeconds = 2d,
+                IgnitionPressurePa = 1.1d, WorkingPressurePa = 0.7d, IgnitionApcPercent = 25d, WorkingApcPercent = 35d
+            }
+        };
+
+        try
+        {
+            var service = new RecipeCsvService();
+            service.Export(path, source);
+
+            var bytes = File.ReadAllBytes(path);
+            Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes[..3]);
+            var lines = File.ReadAllLines(path, Encoding.UTF8);
+            Assert.Equal(3, lines.Length);
+            Assert.Equal(19, lines[0].Split(',').Length);
+            Assert.Equal("序号", lines[0].Split(',')[0]);
+
+            var result = service.Import(path);
+            Assert.True(result.IsSuccessful, string.Join(Environment.NewLine, result.Errors));
+            Assert.Equal(source.Select(layer => layer.Sequence), result.Layers.Select(layer => layer.Sequence));
+            Assert.Equal(source.Select(RecipeDefinitions.Values), result.Layers.Select(RecipeDefinitions.Values));
+            Assert.All(result.Layers, layer => Assert.Equal(RecipePressureControlMode.ImportedValues, layer.PressureControlMode));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void RecipeCsv_RejectsInvalidHeadersAndStageSpeedAboveFiftyRpm()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"recipe-invalid-{Guid.NewGuid():N}.csv");
+        try
+        {
+            var service = new RecipeCsvService();
+            File.WriteAllText(path, "错误表头\r\n", new UTF8Encoding(true));
+            Assert.False(service.Import(path).IsSuccessful);
+
+            service.Export(path, [new RecipeLayer { Sequence = 1, StageSpeedRpm = 50d, GasStabilizationSeconds = 2d }]);
+            var lines = File.ReadAllLines(path, Encoding.UTF8);
+            var fields = lines[1].Split(',');
+            fields[6] = "51";
+            lines[1] = string.Join(',', fields);
+            File.WriteAllLines(path, lines, new UTF8Encoding(true));
+
+            var result = service.Import(path);
+            Assert.False(result.IsSuccessful);
+            Assert.Empty(result.Layers);
+            var error = Assert.Single(result.Errors);
+            Assert.Equal(2, error.RowNumber);
+            Assert.Equal(7, error.ColumnNumber);
+            Assert.Contains("50", error.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData("15", 15d)]
-    [InlineData("500", 500d)]
+    [InlineData("50", 50d)]
     [InlineData("0", 0d)]
     public void NewLayerDialogModel_AcceptsAllowedStageSpeed(string input, double expected)
     {
@@ -73,7 +152,8 @@ public sealed class RecipeFeatureTests
 
     [Theory]
     [InlineData("-15")]
-    [InlineData("501")]
+    [InlineData("50.1")]
+    [InlineData("51")]
     [InlineData("NaN")]
     [InlineData("Infinity")]
     [InlineData("不是数字")]
@@ -84,6 +164,27 @@ public sealed class RecipeFeatureTests
         stageSpeed.ValueText = input;
 
         Assert.False(viewModel.TryBuildLayer(out _, out _));
+    }
+
+    [Fact]
+    public void ImportXlsx_RejectsStageSpeedAboveFiftyRpm()
+    {
+        var path = CreatePositionMappedWorkbook(51d);
+        try
+        {
+            var result = new ExcelRecipeImporter().Import(path);
+
+            Assert.False(result.IsSuccessful);
+            Assert.Empty(result.Layers);
+            var error = Assert.Single(result.Errors);
+            Assert.Equal(2, error.RowNumber);
+            Assert.Equal(7, error.ColumnNumber);
+            Assert.Contains("50", error.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -199,7 +300,36 @@ public sealed class RecipeFeatureTests
 
         Assert.False(viewModel.ImportRecipeCommand.CanExecute(null));
         Assert.False(viewModel.ClearRecipeCommand.CanExecute(null));
+        Assert.False(viewModel.ExportRecipeCommand.CanExecute(null));
         Assert.False(viewModel.NewRecipeLayerCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ProcessViewModel_ExportsCurrentLayersAndImportsTheCsvAgain()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"recipe-command-{Guid.NewGuid():N}.csv");
+        var dialog = new RecordingRecipeDialogService { ExportPath = path };
+        using var viewModel = CreateProcessViewModel(dialog);
+        viewModel.Layers.Add(new RecipeLayer { Sequence = 1, CathodeAPower = 230d, StageSpeedRpm = 50d, GasStabilizationSeconds = 2d });
+        viewModel.Layers.Add(new RecipeLayer { Sequence = 2, CathodeAPower = 320d, StageSpeedRpm = 0d, GasStabilizationSeconds = 2d });
+
+        try
+        {
+            Assert.True(viewModel.ExportRecipeCommand.CanExecute(null));
+            viewModel.ExportRecipeCommand.Execute(null);
+            Assert.True(File.Exists(path));
+            Assert.Contains(dialog.Information, item => item.Title == "配方导出" && item.Message.Contains("2"));
+
+            dialog.RecipeFile = path;
+            viewModel.ImportRecipeCommand.Execute(null);
+            Assert.Equal([1, 2], viewModel.Layers.Select(layer => layer.Sequence));
+            Assert.Equal(50d, viewModel.Layers[0].StageSpeedRpm);
+            Assert.Equal(Path.GetFileName(path), viewModel.LoadedFileName);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -271,7 +401,7 @@ public sealed class RecipeFeatureTests
             ApplicationStatusViewModel.Instance);
     }
 
-    private static string CreatePositionMappedWorkbook()
+    private static string CreatePositionMappedWorkbook(double stageSpeed = 15d)
     {
         var path = Path.Combine(Path.GetTempPath(), $"recipe-position-{Guid.NewGuid():N}.xlsx");
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
@@ -318,7 +448,7 @@ public sealed class RecipeFeatureTests
         WriteEntry(
             archive,
             "xl/worksheets/sheet1.xml",
-            """
+            $$"""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
               <dimension ref="A1:T3"/>
@@ -331,7 +461,7 @@ public sealed class RecipeFeatureTests
                 <row r="2">
                   <c r="A2"><v>1</v></c>
                   <c r="B2"><v>230</v></c>
-                  <c r="G2"><v>15</v></c>
+                  <c r="G2"><v>{{stageSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture)}}</v></c>
                   <c r="R2"><v>30</v></c>
                   <c r="S2"><v>40</v></c>
                   <c r="T2" t="inlineStr"><is><t>此列忽略</t></is></c>
@@ -404,7 +534,15 @@ public sealed class RecipeFeatureTests
     {
         public RecipeLayer? NewLayerResult { get; init; }
 
-        public string? SelectRecipeFile() => null;
+        public string? RecipeFile { get; set; }
+
+        public string? ExportPath { get; init; }
+
+        public List<(string Message, string Title)> Information { get; } = [];
+
+        public string? SelectRecipeFile() => RecipeFile;
+
+        public string? SelectRecipeExportPath(string suggestedFileName) => ExportPath;
 
         public bool ConfirmReplaceExistingRecipe() => true;
 
@@ -418,6 +556,7 @@ public sealed class RecipeFeatureTests
 
         public void ShowInformation(string message, string title)
         {
+            Information.Add((message, title));
         }
 
         public void ShowRunFinished(RecipeRunResult result)

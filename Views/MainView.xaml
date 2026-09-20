@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Small_square_cavity_coating_machine.Views"
         xmlns:controls="clr-namespace:Small_square_cavity_coating_machine.Controls"
         mc:Ignorable="d"
-        Title="小方腔体磁控溅射镀膜机" Height="750" Width="1200"
+        Title="单腔室磁控溅射镀膜机" Height="750" Width="1200"
         Icon="/Resources/AppIcon.ico"
         Closing="MainView_Closing">
     <Window.Resources>

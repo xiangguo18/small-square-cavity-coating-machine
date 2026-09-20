@@ -12,6 +12,7 @@ namespace Small_square_cavity_coating_machine.ViewModels.History;
 
 public abstract partial class TrendChartViewModel : ObservableObject
 {
+    private const string VacuumScientificFormat = "0.00E+00";
     private const string HighVacuumTimeAxisKey = "HighVacuumTime";
     private const string FilmVacuumTimeAxisKey = "FilmVacuumTime";
     private const string HighVacuumValueAxisKey = "HighVacuumValue";
@@ -23,6 +24,7 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private const string TemperatureAxisKey = "Temperature";
 
     private static readonly TimeSpan LiveWindow = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan RefreshedLiveWindow = TimeSpan.FromMinutes(10);
     private static readonly double LiveRightMargin = LiveWindow.TotalDays * 0.02d;
     private readonly Dispatcher _dispatcher;
     private readonly bool _isLive;
@@ -39,6 +41,14 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private readonly LineSeries _temperatureSeries;
     private bool _isApplyingLiveAxisRange;
     private double _liveSessionStart = double.NaN;
+    private readonly double[] _refreshStarts = [double.NaN, double.NaN, double.NaN];
+
+    private enum TrendChart
+    {
+        Vacuum,
+        Power,
+        Temperature
+    }
 
     [ObservableProperty]
     private bool showHighVacuum = true;
@@ -70,6 +80,9 @@ public abstract partial class TrendChartViewModel : ObservableObject
     [ObservableProperty]
     private bool isAutoFollow = true;
 
+    [ObservableProperty]
+    private int selectedChartIndex;
+
     [ObservableProperty] private string acquisitionStatus = "";
     [ObservableProperty] private string recordingError = "";
 
@@ -83,28 +96,32 @@ public abstract partial class TrendChartViewModel : ObservableObject
         _filmVacuumTimeAxis = CreateTimeAxis(FilmVacuumTimeAxisKey, AxisPosition.Top, "薄膜高真空度计时间");
         VacuumPlotModel.Axes.Add(_highVacuumTimeAxis);
         VacuumPlotModel.Axes.Add(_filmVacuumTimeAxis);
-        VacuumPlotModel.Axes.Add(CreateValueAxis(
+        VacuumPlotModel.Axes.Add(CreateLogarithmicValueAxis(
             HighVacuumValueAxisKey,
             AxisPosition.Left,
             "高真空度计 (Pa)",
-            OxyColors.Red));
-        VacuumPlotModel.Axes.Add(CreateValueAxis(
+            OxyColors.Red,
+            VacuumScientificFormat));
+        VacuumPlotModel.Axes.Add(CreateLogarithmicValueAxis(
             FilmVacuumValueAxisKey,
             AxisPosition.Right,
             "薄膜高真空度计 (Pa)",
-            OxyColors.Blue));
+            OxyColors.Blue,
+            VacuumScientificFormat));
         _highVacuumSeries = CreateSeries(
             "高真空度计",
             OxyColors.Red,
             LineStyle.Solid,
             HighVacuumTimeAxisKey,
-            HighVacuumValueAxisKey);
+            HighVacuumValueAxisKey,
+            VacuumScientificFormat);
         _filmVacuumSeries = CreateSeries(
             "薄膜高真空度计",
             OxyColors.Blue,
             LineStyle.Solid,
             FilmVacuumTimeAxisKey,
-            FilmVacuumValueAxisKey);
+            FilmVacuumValueAxisKey,
+            VacuumScientificFormat);
         VacuumPlotModel.Series.Add(_highVacuumSeries);
         VacuumPlotModel.Series.Add(_filmVacuumSeries);
 
@@ -282,6 +299,25 @@ public abstract partial class TrendChartViewModel : ObservableObject
         InvalidatePlots();
     }
 
+    [RelayCommand]
+    private void RefreshCurrentChart()
+    {
+        if (!_isLive)
+        {
+            return;
+        }
+
+        var chart = SelectedChartIndex switch
+        {
+            1 => TrendChart.Power,
+            2 => TrendChart.Temperature,
+            _ => TrendChart.Vacuum
+        };
+        _refreshStarts[(int)chart] = DateTimeAxis.ToDouble(DateTime.Now);
+        ApplyLiveAxes([chart]);
+        InvalidatePlots();
+    }
+
     private static DateTimeAxis CreateTimeAxis(string key, AxisPosition position, string title) =>
         new()
         {
@@ -300,12 +336,37 @@ public abstract partial class TrendChartViewModel : ObservableObject
         string key,
         AxisPosition position,
         string title,
-        OxyColor color) =>
+        OxyColor color,
+        string? stringFormat = null) =>
         new()
         {
             Key = key,
             Position = position,
             Title = title,
+            StringFormat = stringFormat,
+            AxislineColor = color,
+            TextColor = color,
+            TitleColor = color,
+            MajorGridlineStyle = position == AxisPosition.Left ? LineStyle.Solid : LineStyle.None,
+            MinorGridlineStyle = position == AxisPosition.Left ? LineStyle.Dot : LineStyle.None,
+            MajorGridlineColor = OxyColor.FromAColor(70, OxyColors.Gray),
+            MinorGridlineColor = OxyColor.FromAColor(35, OxyColors.Gray)
+        };
+
+    private static LogarithmicAxis CreateLogarithmicValueAxis(
+        string key,
+        AxisPosition position,
+        string title,
+        OxyColor color,
+        string stringFormat) =>
+        new()
+        {
+            Key = key,
+            Position = position,
+            Title = title,
+            Base = 10,
+            PowerPadding = true,
+            StringFormat = stringFormat,
             AxislineColor = color,
             TextColor = color,
             TitleColor = color,
@@ -320,7 +381,8 @@ public abstract partial class TrendChartViewModel : ObservableObject
         OxyColor color,
         LineStyle lineStyle,
         string xAxisKey,
-        string yAxisKey) =>
+        string yAxisKey,
+        string valueFormat = "0.###") =>
         new()
         {
             Title = title,
@@ -329,7 +391,7 @@ public abstract partial class TrendChartViewModel : ObservableObject
             LineStyle = lineStyle,
             XAxisKey = xAxisKey,
             YAxisKey = yAxisKey,
-            TrackerFormatString = "{0}\n时间: {2}\n数值: {4:0.###}"
+            TrackerFormatString = $"{{0}}\n时间: {{2}}\n数值: {{4:{valueFormat}}}"
         };
 
     private void AppendSampleOnUiThread(TelemetrySample sample)
@@ -340,6 +402,12 @@ public abstract partial class TrendChartViewModel : ObservableObject
             if (IsAutoFollow)
             {
                 ApplyLiveAxes();
+            }
+            else
+            {
+                var refreshedCharts = Enum.GetValues<TrendChart>()
+                    .Where(chart => double.IsFinite(_refreshStarts[(int)chart]));
+                ApplyLiveAxes(refreshedCharts);
             }
         }
 
@@ -354,8 +422,8 @@ public abstract partial class TrendChartViewModel : ObservableObject
             _liveSessionStart = timestamp;
         }
 
-        _highVacuumSeries.Points.Add(new DataPoint(timestamp, sample.HighVacuumPa));
-        _filmVacuumSeries.Points.Add(new DataPoint(timestamp, sample.FilmHighVacuumPa));
+        _highVacuumSeries.Points.Add(new DataPoint(timestamp, ToLogarithmicPlotValue(sample.HighVacuumPa)));
+        _filmVacuumSeries.Points.Add(new DataPoint(timestamp, ToLogarithmicPlotValue(sample.FilmHighVacuumPa)));
         _power1VoltageSeries.Points.Add(new DataPoint(timestamp, sample.Power1VoltageV));
         _power1CurrentSeries.Points.Add(new DataPoint(timestamp, sample.Power1CurrentA));
         _power2VoltageSeries.Points.Add(new DataPoint(timestamp, sample.Power2VoltageV));
@@ -363,23 +431,42 @@ public abstract partial class TrendChartViewModel : ObservableObject
         _temperatureSeries.Points.Add(new DataPoint(timestamp, sample.TemperatureC));
     }
 
-    private void ApplyLiveAxes()
+    private static double ToLogarithmicPlotValue(double value) =>
+        double.IsFinite(value) && value > 0d ? value : double.NaN;
+
+    private void ApplyLiveAxes() => ApplyLiveAxes(Enum.GetValues<TrendChart>());
+
+    private void ApplyLiveAxes(IEnumerable<TrendChart> charts)
     {
-        var latest = _highVacuumSeries.Points[^1].X;
-        var hasFilledWindow = latest - _liveSessionStart >= LiveWindow.TotalDays;
-        var minimum = hasFilledWindow ? latest - LiveWindow.TotalDays : _liveSessionStart;
-        var maximum = hasFilledWindow
-            ? latest + LiveRightMargin
-            : _liveSessionStart + LiveWindow.TotalDays;
+        var latest = _highVacuumSeries.Points.Count > 0
+            ? _highVacuumSeries.Points[^1].X
+            : DateTimeAxis.ToDouble(DateTime.Now);
 
         _isApplyingLiveAxisRange = true;
         try
         {
-            foreach (var axis in AllTimeAxes())
+            foreach (var chart in charts)
             {
-                axis.Minimum = minimum;
-                axis.Maximum = maximum;
-                axis.Zoom(minimum, maximum);
+                var start = double.IsFinite(_refreshStarts[(int)chart])
+                    ? _refreshStarts[(int)chart]
+                    : _liveSessionStart;
+                if (!double.IsFinite(start))
+                {
+                    continue;
+                }
+
+                var window = double.IsFinite(_refreshStarts[(int)chart]) ? RefreshedLiveWindow : LiveWindow;
+                var hasFilledWindow = latest - start >= window.TotalDays;
+                var minimum = hasFilledWindow ? latest - window.TotalDays : start;
+                var maximum = hasFilledWindow
+                    ? latest + window.TotalDays * 0.02d
+                    : start + window.TotalDays;
+                foreach (var axis in TimeAxesFor(chart))
+                {
+                    axis.Minimum = minimum;
+                    axis.Maximum = maximum;
+                    axis.Zoom(minimum, maximum);
+                }
             }
         }
         finally
@@ -398,6 +485,7 @@ public abstract partial class TrendChartViewModel : ObservableObject
         }
 
         IsAutoFollow = false;
+        Array.Fill(_refreshStarts, double.NaN);
         _isApplyingLiveAxisRange = true;
         try
         {
@@ -461,6 +549,7 @@ public abstract partial class TrendChartViewModel : ObservableObject
     private void ClearSeries()
     {
         _liveSessionStart = double.NaN;
+        Array.Fill(_refreshStarts, double.NaN);
         foreach (var series in AllSeries())
         {
             series.Points.Clear();
@@ -474,6 +563,14 @@ public abstract partial class TrendChartViewModel : ObservableObject
         _powerTimeAxis,
         _temperatureTimeAxis
     ];
+
+    private DateTimeAxis[] TimeAxesFor(TrendChart chart) => chart switch
+    {
+        TrendChart.Vacuum => [_highVacuumTimeAxis, _filmVacuumTimeAxis],
+        TrendChart.Power => [_powerTimeAxis],
+        TrendChart.Temperature => [_temperatureTimeAxis],
+        _ => throw new ArgumentOutOfRangeException(nameof(chart))
+    };
 
     private IEnumerable<Axis> AllValueAxes() =>
         VacuumPlotModel.Axes

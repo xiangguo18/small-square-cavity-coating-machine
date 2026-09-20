@@ -16,6 +16,7 @@ namespace Small_square_cavity_coating_machine.ViewModels.Recipes;
 public sealed partial class ProcessViewModel : ObservableObject, IDisposable
 {
     private readonly IRecipeExcelImporter _excelImporter;
+    private readonly IRecipeCsvService _csvService;
     private readonly IRecipeDispatchService _dispatchService;
     private readonly IRecipePlcGateway _plcGateway;
     private readonly IRecipeUserDialogService _dialogService;
@@ -35,9 +36,11 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         IRecipeUserDialogService dialogService,
         IOperationLogRepository operationLogRepository,
         ApplicationStatusViewModel applicationStatus,
-        IAuthorizationService? authorization = null, IUiDispatcher? dispatcher = null)
+        IAuthorizationService? authorization = null, IUiDispatcher? dispatcher = null,
+        IRecipeCsvService? csvService = null)
     {
         _excelImporter = excelImporter;
+        _csvService = csvService ?? new RecipeCsvService();
         _dispatchService = dispatchService;
         _plcGateway = plcGateway;
         _dialogService = dialogService;
@@ -86,7 +89,9 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var result = _excelImporter.Import(path);
+        var result = string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase)
+            ? _csvService.Import(path)
+            : _excelImporter.Import(path);
         if (!result.IsSuccessful)
         {
             _dialogService.ShowImportErrors(result.Errors);
@@ -136,6 +141,35 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         RefreshCommandStates();
     }
 
+    [RelayCommand(CanExecute = nameof(CanExportRecipe))]
+    private void ExportRecipe()
+    {
+        if (!EnsureCanOperate())
+        {
+            return;
+        }
+
+        var path = _dialogService.SelectRecipeExportPath($"配方_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var snapshots = Layers.Select(layer => layer.Snapshot()).ToArray();
+        try
+        {
+            _csvService.Export(path, snapshots);
+            var fileName = Path.GetFileName(path);
+            Log("配方导出", $"{fileName}，共 {snapshots.Length} 层", true, string.Empty);
+            _dialogService.ShowInformation($"成功导出 {snapshots.Length} 个配方层。", "配方导出");
+        }
+        catch (Exception exception)
+        {
+            Log("配方导出", Path.GetFileName(path), false, exception.Message);
+            _dialogService.ShowInformation($"配方导出失败：{exception.Message}", "配方导出");
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanImportOrCreate))]
     private void NewRecipeLayer()
     {
@@ -181,6 +215,8 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
     private bool CanImportOrCreate() => !IsRunning;
 
     private bool CanClearRecipe() => !IsRunning && Layers.Count > 0;
+
+    private bool CanExportRecipe() => !IsRunning && Layers.Count > 0;
 
     private bool CanSendAll() =>
         !IsRunning && CanOperate && _plcGateway.IsAvailable && Layers.Count > 0;
@@ -307,6 +343,7 @@ public sealed partial class ProcessViewModel : ObservableObject, IDisposable
         StopAutoDispatchCommand.NotifyCanExecuteChanged();
         ImportRecipeCommand.NotifyCanExecuteChanged();
         ClearRecipeCommand.NotifyCanExecuteChanged();
+        ExportRecipeCommand.NotifyCanExecuteChanged();
         NewRecipeLayerCommand.NotifyCanExecuteChanged();
         SendAllCommand.NotifyCanExecuteChanged();
         SendSelectedCommand.NotifyCanExecuteChanged();

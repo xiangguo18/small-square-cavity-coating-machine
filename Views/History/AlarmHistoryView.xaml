@@ -4,6 +4,24 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignHeight="580" d:DesignWidth="1400">
+    <UserControl.Resources>
+        <Style x:Key="BuzzerButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Background" Value="#E7EDF2"/>
+            <Setter Property="BorderBrush" Value="#7D8B95"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Foreground" Value="#263238"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Background" Value="#55C878"/>
+                    <Setter Property="BorderBrush" Value="#208844"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
@@ -23,7 +41,9 @@
                         Content="查询历史" Command="{Binding QueryCoreCommand}"/>
                 <Button Height="32" Padding="12,0" Margin="0,0,8,0"
                         Content="重置时间" Command="{Binding ClearFiltersCommand}"/>
-                <Button Height="32" Padding="12,0" Content="返回实时" Command="{Binding ReturnToLiveCommand}"/>
+                <Button Height="32" Padding="12,0" Margin="0,0,8,0" Content="返回实时" Command="{Binding ReturnToLiveCommand}"/>
+                <Button Style="{StaticResource BuzzerButtonStyle}" Content="蜂鸣器"
+                        Tag="{Binding BuzzerIsDisabled}" Command="{Binding ToggleBuzzerCommand}"/>
             </WrapPanel>
             <TextBlock Text="{Binding ModeText}" Foreground="#0078D4" FontWeight="SemiBold" Margin="0,0,0,6"/>
             <TextBlock Text="{Binding StorageError}" Foreground="#C62828" TextWrapping="Wrap">

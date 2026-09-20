@@ -10,6 +10,7 @@ public sealed class ControlViewModelPipeFlowTests
     {
         var viewModel = new ControlViewModel
         {
+            ApcIsOpen = false,
             ApcCurrentPosition = 0d
         };
 
@@ -19,12 +20,22 @@ public sealed class ControlViewModelPipeFlowTests
         Assert.False(viewModel.RightForelineToDryPumpPipeIsFlowing);
 
         viewModel.ApcCurrentPosition = 25d;
+        Assert.False(viewModel.ChamberToApcPipeIsFlowing);
+        Assert.False(viewModel.ApcToTurboPipeIsFlowing);
+
+        viewModel.ApcIsOpen = true;
         Assert.True(viewModel.ChamberToApcPipeIsFlowing);
         Assert.False(viewModel.ApcToTurboPipeIsFlowing);
 
         viewModel.TurboPumpIsRunning = true;
         Assert.True(viewModel.ApcToTurboPipeIsFlowing);
         Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
+
+        viewModel.ApcIsOpen = false;
+        Assert.False(viewModel.ChamberToApcPipeIsFlowing);
+        Assert.False(viewModel.ApcToTurboPipeIsFlowing);
+
+        viewModel.ApcIsOpen = true;
 
         viewModel.RightForelineValveIsOpen = true;
         Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
@@ -189,6 +200,12 @@ public sealed class ControlViewModelPipeFlowTests
 
         Assert.Contains(nameof(ControlViewModel.ApcToTurboPipeIsFlowing), changedProperties);
         Assert.Contains(nameof(ControlViewModel.TurboToRightForelinePipeIsFlowing), changedProperties);
+
+        changedProperties.Clear();
+        viewModel.ApcIsOpen = false;
+
+        Assert.Contains(nameof(ControlViewModel.ChamberToApcPipeIsFlowing), changedProperties);
+        Assert.Contains(nameof(ControlViewModel.ApcToTurboPipeIsFlowing), changedProperties);
 
         changedProperties.Clear();
         viewModel.ArgonUpperValveIsOpen = true;

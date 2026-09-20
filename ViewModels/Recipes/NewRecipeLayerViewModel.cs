@@ -53,6 +53,7 @@ public sealed partial class NewRecipeLayerViewModel : ObservableObject
         _definitions = definitions ?? RecipeDefinitions.Default;
         MaximumSequence = sequence;
         SequenceText = sequence.ToString(CultureInfo.InvariantCulture);
+        var stageSpeedDefinition = _definitions[5];
 
         PowerAndTimeInputs =
         [
@@ -64,8 +65,9 @@ public sealed partial class NewRecipeLayerViewModel : ObservableObject
             new(
                 "样品台转速",
                 "rpm",
-                maximum: 500,
-                hint: "允许0～500 rpm，0停止"),
+                defaultValue: stageSpeedDefinition.DefaultValue,
+                maximum: stageSpeedDefinition.Maximum,
+                hint: $"允许{stageSpeedDefinition.Minimum:0.###}～{stageSpeedDefinition.Maximum:0.###} rpm，0停止"),
             new("镀膜时间", "s")
         ];
 

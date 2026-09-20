@@ -18,6 +18,7 @@ public static class EquipmentGroups
     public const string Interlock = "EQ_Interlock";
     public const string PassInterlock = "EQ_PassInterlock";
     public const string Recipe = "EQ_Recipe1", RecipeOk = "EQ_RecipeOK", CoatOk = "EQ_CoatOK";
+    public const string RecipeLoad = "EQ_Recipe1Load";
     public static readonly string[] SystemControlPoints =
     [
         "EQ_Manual", "fbButtonManual_Output",
@@ -26,6 +27,7 @@ public static class EquipmentGroups
         "EQ_Start", "fbButtonStart_Output",
         "EQ_Stop", "fbButtonStop_Output",
         "EQ_Reset", "fbButtonReset_Output",
+        "EQ_BuzzerDisable", "fbButtonBuzzerDisable_Output",
         PassInterlock,
         "fbButtonPumpStart_Output", "fbButtonVentStart_Output", "fbButtonHP_Start_Output"
     ];
@@ -35,12 +37,19 @@ public static class EquipmentGroups
         PartDataSet1, PartDataSet2, Interlock
     ];
     public static readonly string[] All = [Alarm, Io, Parameter];
+    /// <summary>配方反馈节点：必须可读、订阅且可写。</summary>
     public static readonly string[] RecipePoints = [Recipe, RecipeOk, CoatOk];
+    /// <summary>配方下发可写点，包含仅写的加载触发信号。</summary>
+    public static readonly string[] RecipeWritePoints = [.. RecipePoints, RecipeLoad];
     public static readonly string[] Monitored = [.. All, Process, .. ControlArrays, .. SystemControlPoints, .. RecipePoints];
-    public static bool IsScalar(string group) => group == RecipeOk || group == CoatOk || SystemControlPoints.Contains(group, StringComparer.Ordinal);
+    /// <summary>发现范围比订阅范围多出仅写的配方加载触发点。</summary>
+    public static readonly string[] Discoverable = [.. Monitored, RecipeLoad];
+    public static bool IsWriteOnlyRecipeTrigger(string group) => group == RecipeLoad;
+    public static bool IsScalar(string group) => group == RecipeOk || group == CoatOk || group == RecipeLoad
+        || SystemControlPoints.Contains(group, StringComparer.Ordinal);
     public static bool IsFlag(string group) => IsScalar(group);
     public static bool IsWritable(string group) => group == Parameter || group == Recipe
-        || group == RecipeOk || group == CoatOk
+        || group == RecipeOk || group == CoatOk || group == RecipeLoad
         || group == PartCommand || group == PartDataSet1 || group == PartDataSet2
         || group == PassInterlock || SystemControlPoints.Contains(group, StringComparer.Ordinal)
             && !group.StartsWith("fbButton", StringComparison.Ordinal);
@@ -103,9 +112,11 @@ public sealed record EquipmentControlDefinitions(
 
 public sealed record ControlWriteRequest(string Address, object Value, long Epoch, string Target, string Action,
     PermissionKey Permission, bool RequiresBuiltInAdministrator = false,
+    bool SkipAuthorization = false,
     ControlConfirm Confirm = ControlConfirm.ReadBack,
     string? StateAddress = null,
     bool ExpectOpen = false,
+    PartStateConfirmationProfile StateConfirmationProfile = PartStateConfirmationProfile.Generic,
     int ConfirmTimeoutMs = 5000,
     IReadOnlyList<ArrayWriteMutation>? ArrayMutations = null);
 
@@ -121,4 +132,14 @@ public enum ControlConfirm
     ReadBack = 0,
     Sent = 1,
     State = 2
+}
+
+/// <summary>
+/// Part_State 的确认方式。大部分部件沿用开/关/故障位；泵使用 PLC 定义的数值状态机。
+/// </summary>
+public enum PartStateConfirmationProfile
+{
+    Generic,
+    DryPump,
+    TurboPump
 }

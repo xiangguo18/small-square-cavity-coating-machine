@@ -1,10 +1,13 @@
 using Small_square_cavity_coating_machine.Models.Equipment;
 using Small_square_cavity_coating_machine.Models.Security;
+using Small_square_cavity_coating_machine.Controls;
 using Small_square_cavity_coating_machine.Services;
 using Small_square_cavity_coating_machine.Services.Alarms;
 using Small_square_cavity_coating_machine.Services.Equipment;
+using Small_square_cavity_coating_machine.Services.History;
 using Small_square_cavity_coating_machine.Services.Security;
 using Small_square_cavity_coating_machine.ViewModels;
+using Small_square_cavity_coating_machine.ViewModels.History;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -51,6 +54,8 @@ public sealed class ControlBindingFeatureTests
         Assert.Equal("Part_Data_Set2[0]", controls.Data[21].SetAddress);
         Assert.Equal("Part_Data1[26]", controls.Data[26].Address);
         Assert.Equal("Part_Data_Set1[1]", controls.Data[1].SetAddress);
+        Assert.Equal(50d, controls.Data[3].Maximum);
+        Assert.Equal("Part_Data_Set2[2]", controls.Data[3].SetAddress);
         Assert.Equal("Part_Data_Set1[4]", controls.Data[7].SetAddress);
         Assert.Equal("Part_Data_Set1[5]", controls.Data[8].SetAddress);
         Assert.Equal("Part_Data_Set1[6]", controls.Data[9].SetAddress);
@@ -66,6 +71,9 @@ public sealed class ControlBindingFeatureTests
         Assert.Equal("Part_State[32]", controls.SystemCommands["Auto"].FeedbackAddress);
         Assert.Equal("Part_State[31]", controls.SystemCommands["Semi"].FeedbackAddress);
         Assert.Equal("Part_State[30]", controls.SystemCommands["Manual"].FeedbackAddress);
+        Assert.Equal("EQ_BuzzerDisable", controls.SystemCommands["BuzzerDisable"].CommandAddress);
+        Assert.Equal("fbButtonBuzzerDisable_Output", controls.SystemCommands["BuzzerDisable"].FeedbackAddress);
+        Assert.False(controls.SystemCommands["BuzzerDisable"].RequiresBuiltInAdministrator);
         Assert.Equal("EQ_PassInterlock", controls.SystemCommands["PassInterlock"].FeedbackAddress);
         var expectedStates = new Dictionary<int, int>
         {
@@ -91,6 +99,18 @@ public sealed class ControlBindingFeatureTests
     }
 
     [Fact]
+    public void Turbo_pump_speed_display_uses_live_percent_or_unavailable_placeholder()
+    {
+        using var viewModel = new ControlViewModel();
+
+        viewModel.TurboPumpCurrentSpeed = 85.04d;
+        Assert.Equal("85.0 %", viewModel.TurboPumpSpeedDisplay);
+
+        viewModel.TurboPumpCurrentSpeed = double.NaN;
+        Assert.Equal("-- %", viewModel.TurboPumpSpeedDisplay);
+    }
+
+    [Fact]
     public void Duplicate_part_state_address_is_rejected_instead_of_guessed()
     {
         using var temp = new AlarmFeatureTests.TemporaryDirectory();
@@ -108,6 +128,49 @@ public sealed class ControlBindingFeatureTests
             command.ExecuteNonQuery();
         }
         Assert.Throws<InvalidOperationException>(() => new SqliteEquipmentDefinitionRepository(path).LoadControls());
+    }
+
+    [Fact]
+    public async Task Sample_stage_speed_above_fifty_is_rejected_before_plc_write()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var setpointBefore = viewModel.SampleStageSetpointSpeed;
+        var writesBefore = harness.Session.ControlWrites.Count;
+
+        viewModel.SetSampleStageSpeedCommand.Execute(51d);
+
+        Assert.Equal(setpointBefore, viewModel.SampleStageSetpointSpeed);
+        Assert.Equal(writesBefore, harness.Session.ControlWrites.Count);
+        Assert.Equal("样品台转速允许范围：0～50 rpm", viewModel.ControlStatusText);
+
+        var serviceResult = await harness.Service.WriteSetpointAsync(3, 51d, PermissionKey.SystemStatus);
+        Assert.Equal(ControlWriteOutcome.Rejected, serviceResult.Outcome);
+        Assert.Equal(writesBefore, harness.Session.ControlWrites.Count);
+    }
+
+    [Fact]
+    public async Task Buzzer_button_writes_without_hmi_permission_and_follows_plc_feedback()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        harness.Authorization.Allowed = false;
+        using var viewModel = new AlarmHistoryViewModel(new InMemoryAlarmLogRepository(),
+            new AlarmFeatureTests.InlineDispatcher(), controlService: harness.Service);
+
+        Assert.False(viewModel.BuzzerIsDisabled);
+        viewModel.ToggleBuzzerCommand.Execute(null);
+
+        await AlarmArrayConnectionTests.Until(() => harness.Session.ControlWrites.Any(write =>
+            write.Group == "EQ_BuzzerDisable" && Equals(write.Value, true)));
+        await AlarmArrayConnectionTests.Until(() => viewModel.BuzzerIsDisabled);
+        Assert.Contains(harness.Session.ControlWrites, write =>
+            write.Group == "EQ_BuzzerDisable" && Equals(write.Value, true));
+
+        // PLC 反馈撤销后，灯态立即熄灭；界面不以命令写入结果作本地切换。
+        harness.Session.Scalars["fbButtonBuzzerDisable_Output"] = false;
+        harness.Session.Send("fbButtonBuzzerDisable_Output");
+        await AlarmArrayConnectionTests.Until(() => !viewModel.BuzzerIsDisabled);
     }
 
     [Fact]
@@ -157,7 +220,7 @@ public sealed class ControlBindingFeatureTests
 
         var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
         states[0] = 1 << 1;
-        states[1] = (1 << 1) | (1 << 7);
+        states[1] = 4;
         states[2] = 1 << 1;
         states[4] = 1 << 1;
         states[5] = 1 << 1;
@@ -213,6 +276,82 @@ public sealed class ControlBindingFeatureTests
         harness.Session.Send(EquipmentGroups.PartState);
         Assert.False(viewModel.Target2ShutterIsOn);
         Assert.False(viewModel.Target2ShutterIsFaulted);
+    }
+
+    [Fact]
+    public async Task Pump_numeric_state_words_drive_visuals_commands_confirmations_and_pipe_flow()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        using var viewModel = new ControlViewModel(harness.Runtime, harness.Authorization, harness.Service,
+            new AlarmFeatureTests.InlineDispatcher());
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+        states[2] = 2;   // APC 开，用于验证分子泵抽气管路。
+        states[22] = 2;  // 前级阀开，用于验证干泵前级管路。
+
+        states[0] = 0;
+        states[1] = 0;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(PumpVisualState.Idle, viewModel.DryPumpVisualState);
+        Assert.False(viewModel.DryPumpIsRunning);
+        Assert.Equal(PumpVisualState.Idle, viewModel.TurboPumpVisualState);
+        Assert.False(viewModel.TurboPumpIsRunning);
+        Assert.False(viewModel.ApcToTurboPipeIsFlowing);
+
+        states[0] = 2;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(PumpVisualState.Green, viewModel.DryPumpVisualState);
+        Assert.True(viewModel.DryPumpIsRunning);
+        Assert.True(viewModel.RightForelineToDryPumpPipeIsFlowing);
+
+        states[0] = 6;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(PumpVisualState.GreenBlink, viewModel.DryPumpVisualState);
+        Assert.True(viewModel.DryPumpIsRunning);
+
+        var turboStates = new (ushort Raw, PumpVisualState Visual, bool Faulted)[]
+        {
+            (1, PumpVisualState.Green, false),
+            (2, PumpVisualState.Yellow, false),
+            (3, PumpVisualState.Yellow, false),
+            (4, PumpVisualState.Red, true),
+            (5, PumpVisualState.GreenBlink, false),
+            (6, PumpVisualState.YellowBlink, false)
+        };
+        foreach (var expected in turboStates)
+        {
+            states[1] = expected.Raw;
+            harness.Session.Send(EquipmentGroups.PartState);
+            Assert.Equal(expected.Visual, viewModel.TurboPumpVisualState);
+            Assert.True(viewModel.TurboPumpIsRunning);
+            Assert.Equal(expected.Faulted, viewModel.TurboPumpIsFaulted);
+            Assert.True(viewModel.ApcToTurboPipeIsFlowing);
+            Assert.True(viewModel.TurboToRightForelinePipeIsFlowing);
+        }
+
+        states[1] = 7;
+        harness.Session.Send(EquipmentGroups.PartState);
+        var writesBeforeUnknown = harness.Session.ArrayWrites.Count;
+        viewModel.ToggleTurboPumpCommand.Execute(null);
+        Assert.False(viewModel.TurboPumpStateKnown);
+        Assert.Equal(PumpVisualState.Idle, viewModel.TurboPumpVisualState);
+        Assert.Equal(writesBeforeUnknown, harness.Session.ArrayWrites.Count);
+        Assert.Contains("状态值未知", viewModel.ControlStatusText);
+
+        states[0] = 0;
+        states[1] = 0;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(0, "干泵", "启动")).Outcome);
+        Assert.Equal((ushort)2, states[0]);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(1, "干泵", "停止")).Outcome);
+        Assert.Equal((ushort)0, states[0]);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(2, "分子泵", "启动")).Outcome);
+        Assert.Equal((ushort)1, states[1]);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(3, "分子泵", "停止")).Outcome);
+        Assert.Equal((ushort)0, states[1]);
     }
 
     [Fact]
@@ -731,6 +870,42 @@ public sealed class ControlBindingFeatureTests
             Confirm: ControlConfirm.State, StateAddress: "Part_State[5]", ExpectOpen: true, ConfirmTimeoutMs: 200));
         Assert.Equal(ControlWriteOutcome.Unknown, timeout.Outcome);
         Assert.Contains("状态未确认", timeout.Message);
+    }
+
+    [Fact]
+    public async Task Pump_numeric_states_use_their_own_start_stop_confirmation_rules()
+    {
+        await using var harness = await ControlHarness.CreateAsync();
+        harness.Session.ApplyFeedback = false;
+        var states = (ushort[])harness.Session.Values[EquipmentGroups.PartState];
+
+        states[0] = 6;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(0, "干泵", "启动")).Outcome);
+        states[0] = 0;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(1, "干泵", "停止")).Outcome);
+
+        foreach (var startingState in new ushort[] { 1, 2, 3, 5, 6 })
+        {
+            states[1] = startingState;
+            harness.Session.Send(EquipmentGroups.PartState);
+            Assert.Equal(ControlWriteOutcome.Confirmed,
+                (await harness.Service.ExecutePartCommandAsync(2, "分子泵", "启动")).Outcome);
+        }
+
+        states[1] = 4;
+        harness.Session.Send(EquipmentGroups.PartState);
+        var fault = await harness.Service.ExecutePartCommandAsync(2, "分子泵", "启动");
+        Assert.Equal(ControlWriteOutcome.Rejected, fault.Outcome);
+        Assert.Contains("状态故障", fault.Message);
+
+        states[1] = 0;
+        harness.Session.Send(EquipmentGroups.PartState);
+        Assert.Equal(ControlWriteOutcome.Confirmed,
+            (await harness.Service.ExecutePartCommandAsync(3, "分子泵", "停止")).Outcome);
     }
 
     [Fact]

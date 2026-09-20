@@ -133,6 +133,7 @@ public sealed class ApplicationServices : IDisposable
         RecipePlcGateway = new OpcUaRecipePlcGateway(EquipmentClient, runtime, recipeDefinitions,
             definitionErrors.GetValueOrDefault(EquipmentGroups.Recipe, ""));
         var recipeImporter = new ExcelRecipeImporter(recipeDefinitions);
+        var recipeCsvService = new RecipeCsvService(recipeDefinitions);
         var recipeDialogService = new WpfRecipeUserDialogService(recipeDefinitions);
         var recipeDispatchService = new RecipeDispatchService(
             RecipePlcGateway,
@@ -144,7 +145,7 @@ public sealed class ApplicationServices : IDisposable
             recipeDialogService,
             OperationLogRepository,
             ApplicationStatusViewModel.Instance,
-            AuthorizationService, _uiDispatcher);
+            AuthorizationService, _uiDispatcher, recipeCsvService);
 
         var liveTrend = new LiveTrendViewModel(
             dispatcher,
@@ -157,7 +158,8 @@ public sealed class ApplicationServices : IDisposable
             fileDialogService, ProcessTrendRecorder);
         var operationHistory = new OperationHistoryViewModel(OperationLogRepository, _uiDispatcher);
         var alarmHistory = new AlarmHistoryViewModel(AlarmLogRepository, _uiDispatcher,
-            simulator is not null ? new AlarmSimulationViewModel(simulator, AlarmDefinitions) : null);
+            simulator is not null ? new AlarmSimulationViewModel(simulator, AlarmDefinitions) : null,
+            ControlService);
         HistoryViewModel = new HistoryViewModel(
             liveTrend,
             processTrend,

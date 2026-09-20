@@ -67,6 +67,19 @@ public enum PumpLabelPlacement
 }
 
 /// <summary>
+/// 泵图标的 PLC 反馈外观。该状态只控制显示，不承担命令或互锁含义。
+/// </summary>
+public enum PumpVisualState
+{
+    Idle,
+    Green,
+    Yellow,
+    Red,
+    GreenBlink,
+    YellowBlink
+}
+
+/// <summary>
 /// 真空度计文本框相对圆形符号的显示位置。
 /// </summary>
 public enum GaugeTextPlacement

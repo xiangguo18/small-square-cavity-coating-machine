@@ -22,7 +22,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
     private readonly bool[] _interlocks = Enumerable.Repeat(true, 16).ToArray();
     private readonly Dictionary<string, bool> _scalars = new(StringComparer.Ordinal);
     private readonly IReadOnlyList<ProcessDefinition> _processDefinitions;
-    private bool _recipeOk = true, _coatOk = true;
+    private bool _recipeOk = true, _coatOk = true, _recipeLoad;
     private Session? _current;
     private bool _online = true;
 
@@ -90,7 +90,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
         private readonly CancellationTokenSource _stop = new();
         private Task? _processLoop;
         public Task<IReadOnlyDictionary<string, EquipmentBinding>> DiscoverAsync(CancellationToken token) =>
-            Task.FromResult<IReadOnlyDictionary<string, EquipmentBinding>>(EquipmentGroups.Monitored.ToDictionary(g => g,
+            Task.FromResult<IReadOnlyDictionary<string, EquipmentBinding>>(EquipmentGroups.Discoverable.ToDictionary(g => g,
                 g => new EquipmentBinding(g, true, EquipmentGroups.IsWritable(g), ElementType(g), "")));
         private static Type ElementType(string group) => group == EquipmentGroups.PartState ? typeof(ushort)
             : group == EquipmentGroups.Parameter || group == EquipmentGroups.Recipe || group == EquipmentGroups.Process
@@ -110,7 +110,8 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
             }
         }
         private object ScalarValue(string group) => group == EquipmentGroups.RecipeOk ? owner._recipeOk
-            : group == EquipmentGroups.CoatOk ? owner._coatOk : owner._scalars[group];
+            : group == EquipmentGroups.CoatOk ? owner._coatOk
+            : group == EquipmentGroups.RecipeLoad ? owner._recipeLoad : owner._scalars[group];
         public Task<IReadOnlyDictionary<string, string>> SubscribeGroupsAsync(IReadOnlyList<string> groups, Action<string, DataValue> onValue, CancellationToken token)
         {
             _callback = onValue;
@@ -205,7 +206,12 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
                 };
                 if (state.Part >= 0)
                 {
-                    owner._partStates[state.Part] = state.Open ? (ushort)2 : (ushort)1;
+                    owner._partStates[state.Part] = state.Part switch
+                    {
+                        0 => state.Open ? (ushort)2 : (ushort)0,
+                        1 => state.Open ? (ushort)1 : (ushort)0,
+                        _ => state.Open ? (ushort)2 : (ushort)1
+                    };
                     Publish(EquipmentGroups.PartState);
                 }
             }
@@ -234,6 +240,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
                     "EQ_Start" => ("fbButtonStart_Output", 33),
                     "EQ_Stop" => ("fbButtonStop_Output", 34),
                     "EQ_Reset" => ("fbButtonReset_Output", 35),
+                    "EQ_BuzzerDisable" => ("fbButtonBuzzerDisable_Output", -1),
                     _ => ("", -1)
                 };
                 if (output.Length > 0) { owner._scalars[output] = (bool)value; Publish(output); }
@@ -252,6 +259,7 @@ public sealed class SimulatedEquipmentSessionFactory : IEquipmentSessionFactory,
                 if (_disposed || !owner._online) throw new InvalidOperationException("模拟连接已断开");
                 if (group == EquipmentGroups.Recipe) Array.Copy((Array)value, owner._recipe, 18);
                 else if (group == EquipmentGroups.CoatOk) owner._coatOk = (bool)value;
+                else if (group == EquipmentGroups.RecipeLoad) owner._recipeLoad = (bool)value;
                 else if (group == EquipmentGroups.RecipeOk)
                 {
                     owner._recipeOk = (bool)value;

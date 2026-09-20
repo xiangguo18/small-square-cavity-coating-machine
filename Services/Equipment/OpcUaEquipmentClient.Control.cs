@@ -29,7 +29,7 @@ public sealed partial class OpcUaEquipmentClient
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
                 if (_recipePending || _recipeLease is not null) throw new InvalidOperationException("配方任务运行期间禁止手动控制");
-                if (!_authorization.CanOperate(request.Permission)) throw new InvalidOperationException("当前账号没有此控制权限");
+                if (!request.SkipAuthorization && !_authorization.CanOperate(request.Permission)) throw new InvalidOperationException("当前账号没有此控制权限");
                 if (request.RequiresBuiltInAdministrator && !_authorization.IsBuiltInAdministrator)
                     throw new InvalidOperationException("只有当前登录的内置管理员可以解除或恢复互锁");
                 if (!_addressGroups.TryGetValue(request.Address, out group!)) throw new InvalidOperationException("不是数据库定义的控制地址");
@@ -57,7 +57,7 @@ public sealed partial class OpcUaEquipmentClient
             await Task.Run(() => _runtime.BeginWrite(pending), lifetime.Token).ConfigureAwait(false);
             audit = pending;
 
-            if (!_authorization.CanOperate(request.Permission) || _authorization.CurrentUserName != user
+            if ((!request.SkipAuthorization && !_authorization.CanOperate(request.Permission)) || _authorization.CurrentUserName != user
                 || request.RequiresBuiltInAdministrator && !_authorization.IsBuiltInAdministrator)
                 throw new InvalidOperationException("账号或权限已变化，本次未发送");
             lock (_gate)
@@ -171,9 +171,16 @@ public sealed partial class OpcUaEquipmentClient
                     || word is not bool && !ParameterValueCodec.IsValid(word))
                     throw new InvalidOperationException("状态点回读质量或数据类型无效");
                 var value = Convert.ToUInt64(word);
-                if ((value & (1UL << 7)) != 0) { faulted = true; break; }
-                var expectedBit = request.ExpectOpen ? 1UL << 1 : 1UL;
-                if ((value & expectedBit) != 0) { confirmed = true; break; }
+                switch (ConfirmPumpOrPartState(request.StateConfirmationProfile, value, request.ExpectOpen))
+                {
+                    case PartStateConfirmationResult.Confirmed:
+                        confirmed = true;
+                        break;
+                    case PartStateConfirmationResult.Faulted:
+                        faulted = true;
+                        break;
+                }
+                if (confirmed || faulted) break;
                 await Task.Delay(100, deadline.Token).ConfigureAwait(false);
             }
         }
@@ -186,6 +193,30 @@ public sealed partial class OpcUaEquipmentClient
         if (faulted)
             return new(ControlWriteOutcome.Rejected, $"{request.Target}{request.Action}状态故障");
         return new(ControlWriteOutcome.Unknown, $"{request.Target}{request.Action}已发送，5秒内状态未确认");
+    }
+
+    private static PartStateConfirmationResult ConfirmPumpOrPartState(PartStateConfirmationProfile profile,
+        ulong value, bool expectOpen) => profile switch
+    {
+        PartStateConfirmationProfile.DryPump when expectOpen && value is 2 or 6 => PartStateConfirmationResult.Confirmed,
+        PartStateConfirmationProfile.DryPump when !expectOpen && value == 0 => PartStateConfirmationResult.Confirmed,
+        PartStateConfirmationProfile.DryPump when (value & (1UL << 7)) != 0 => PartStateConfirmationResult.Faulted,
+
+        PartStateConfirmationProfile.TurboPump when value == 4 => PartStateConfirmationResult.Faulted,
+        PartStateConfirmationProfile.TurboPump when expectOpen && value is 1 or 2 or 3 or 5 or 6 => PartStateConfirmationResult.Confirmed,
+        PartStateConfirmationProfile.TurboPump when !expectOpen && value == 0 => PartStateConfirmationResult.Confirmed,
+
+        PartStateConfirmationProfile.Generic when (value & (1UL << 7)) != 0 => PartStateConfirmationResult.Faulted,
+        PartStateConfirmationProfile.Generic when expectOpen && (value & (1UL << 1)) != 0 => PartStateConfirmationResult.Confirmed,
+        PartStateConfirmationProfile.Generic when !expectOpen && (value & 1UL) != 0 => PartStateConfirmationResult.Confirmed,
+        _ => PartStateConfirmationResult.Pending
+    };
+
+    private enum PartStateConfirmationResult
+    {
+        Pending,
+        Confirmed,
+        Faulted
     }
 
     private static object ConvertControlValue(object value, Type targetType)

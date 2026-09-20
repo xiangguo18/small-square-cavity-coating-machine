@@ -12,7 +12,7 @@ public sealed partial class OpcUaEquipmentClient
     private bool _recipePending;
     public bool RecipeAvailable
     {
-        get { lock (_gate) return _recipeLease is null && RecipeReady(); }
+        get { lock (_gate) return _recipeLease is null && RecipeReady() && RecipeLoadReady(); }
     }
     /// <summary>返回 EQ_Recipe1 的实际元素类型、数组长度与配方覆盖范围，用于诊断写入 BadTypeMismatch。</summary>
     public string RecipeNodeDiagnostics
@@ -45,6 +45,9 @@ public sealed partial class OpcUaEquipmentClient
     private bool RecipeReady() => _phase == AlarmConnectionPhase.Connected && _session is not null
         && EquipmentGroups.RecipePoints.All(g => _groups.TryGetValue(g, out var state) && state.IsReady
             && state.Points.Values.All(p => p.CanWrite));
+
+    private bool RecipeLoadReady() => _groups.TryGetValue(EquipmentGroups.RecipeLoad, out var state)
+        && state.IsReady && state.Points.TryGetValue(EquipmentGroups.RecipeLoad, out var point) && point.CanWrite;
 
     private void ApplyRecipeFlag(string group, DataValue data, EquipmentBinding binding)
     {
@@ -83,7 +86,8 @@ public sealed partial class OpcUaEquipmentClient
             if (!acquired) throw new TimeoutException("等待已有参数事务超过15秒；本次未启动");
             lock (_gate)
             {
-                if (_disposed || !RecipeReady() || _sessionLifetime is null) throw new InvalidOperationException("配方点未就绪、不可写或质量无效");
+                if (_disposed || !RecipeReady() || !RecipeLoadReady() || _sessionLifetime is null)
+                    throw new InvalidOperationException("配方点或配方加载触发点未就绪、不可写或质量无效");
                 if (!_authorization.CanOperate(PermissionKey.ProcessRecipe)) throw new InvalidOperationException("没有工艺配方权限");
                 lease = new(this, _session!, _epoch, _options.EndpointUrl, _authorization.CurrentUserName, _sessionLifetime.Token, token);
                 _recipeLease = lease;

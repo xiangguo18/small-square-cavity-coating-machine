@@ -75,6 +75,13 @@ public interface IRecipeExcelImporter
     RecipeImportResult Import(string filePath);
 }
 
+public interface IRecipeCsvService
+{
+    RecipeImportResult Import(string filePath);
+
+    void Export(string filePath, IReadOnlyList<RecipeLayer> layers);
+}
+
 /// <summary>Business protocol: begin, verified layer/reset, wait for completion, commit CoatOK.</summary>
 public interface IRecipePlcGateway
 {
@@ -101,6 +108,8 @@ public interface IRecipeDispatchService
 public interface IRecipeUserDialogService
 {
     string? SelectRecipeFile();
+
+    string? SelectRecipeExportPath(string suggestedFileName) => null;
 
     bool ConfirmReplaceExistingRecipe();
 

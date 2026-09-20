@@ -7,7 +7,7 @@ namespace Small_square_cavity_coating_machine.ViewModels
     {
         // 页面标题
         [ObservableProperty]
-        private string title = "小方腔镀膜机控制系统";
+        private string title = "单腔室磁控溅射镀膜机";
 
         // 设备状态
         [ObservableProperty]

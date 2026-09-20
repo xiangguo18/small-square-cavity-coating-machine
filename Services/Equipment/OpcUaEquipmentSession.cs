@@ -25,7 +25,7 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
             timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            var candidates = EquipmentGroups.Monitored.ToDictionary(g => g, _ => new HashSet<NodeId>());
+            var candidates = EquipmentGroups.Discoverable.ToDictionary(g => g, _ => new HashSet<NodeId>());
             var queue = new Queue<NodeId>();
             var visited = new HashSet<NodeId> { ObjectIds.ObjectsFolder };
             queue.Enqueue(ObjectIds.ObjectsFolder);
@@ -40,7 +40,7 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
                     if (node.NodeClass is NodeClass.Variable or NodeClass.Object) queue.Enqueue(node.Id);
                 }
             }
-            foreach (var group in EquipmentGroups.Monitored)
+            foreach (var group in EquipmentGroups.Discoverable)
             {
                 try
                 {
@@ -72,10 +72,11 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
                     new ReadValueId { NodeId = id, AttributeId = Attributes.UserAccessLevel },
                     new ReadValueId { NodeId = id, AttributeId = Attributes.DataType }
                 }, token).ConfigureAwait(false);
+            var requiresRead = !EquipmentGroups.IsWriteOnlyRecipeTrigger(group);
             if (values.Results.Count != 3 || values.Results.Any(v => !StatusCode.IsGood(v.StatusCode))
                 || values.Results[0].Value is not int rank || (EquipmentGroups.IsScalar(group) ? rank != ValueRanks.Scalar : rank is not (0 or 1))
-                || values.Results[1].Value is not byte access || (access & AccessLevels.CurrentRead) == 0)
-                return new(group, false, false, null, "节点不是可读的一维数组");
+                || values.Results[1].Value is not byte access || (requiresRead && (access & AccessLevels.CurrentRead) == 0))
+                return new(group, false, false, null, requiresRead ? "节点不是可读的一维数组" : "配方加载触发点元数据无效");
             var dataType = values.Results[2].Value as NodeId;
             Type? type = dataType == DataTypeIds.Boolean ? typeof(bool)
                 : dataType == DataTypeIds.Float ? typeof(float) : dataType == DataTypeIds.Double ? typeof(double)
@@ -85,8 +86,10 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
                 : dataType == DataTypeIds.Int64 ? typeof(long) : dataType == DataTypeIds.UInt64 ? typeof(ulong) : null;
             if (group == EquipmentGroups.Process && type != typeof(float) && type != typeof(double))
                 return new(group, false, false, type, "EQ_Process必须为Float/Double一维数组");
-            return new(group, true, EquipmentGroups.IsWritable(group) && (access & AccessLevels.CurrentWrite) != 0,
-                type, type is null ? "不支持的PLC元素数据类型" : "");
+            var canWrite = EquipmentGroups.IsWritable(group) && (access & AccessLevels.CurrentWrite) != 0;
+            if (EquipmentGroups.IsWriteOnlyRecipeTrigger(group) && (!canWrite || type is null))
+                return new(group, false, false, type, !canWrite ? "配方加载触发点不可写" : "配方加载触发点类型不支持");
+            return new(group, true, canWrite, type, type is null ? "不支持的PLC元素数据类型" : "");
         }
 
         public async Task<DataValue> ReadGroupAsync(string group, int? index, CancellationToken token)
@@ -216,7 +219,7 @@ namespace Small_square_cavity_coating_machine.Services.Alarms
 
         public async Task WriteRecipeValueAsync(string group, object value, CancellationToken token)
         {
-            if (!EquipmentGroups.RecipePoints.Contains(group) || !_groupBindings.TryGetValue(group, out var binding)
+            if (!EquipmentGroups.RecipeWritePoints.Contains(group) || !_groupBindings.TryGetValue(group, out var binding)
                 || !binding.Available || !binding.CanWrite) throw new InvalidOperationException("配方节点不可写");
             if (group == EquipmentGroups.Recipe
                 ? value is not Array { Rank: 1, Length: 18 } || value.GetType().GetElementType() != binding.ElementType

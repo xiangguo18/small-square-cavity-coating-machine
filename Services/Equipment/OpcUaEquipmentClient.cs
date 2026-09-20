@@ -55,6 +55,7 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
             _addresses[EquipmentGroups.Recipe] = Enumerable.Range(0, 18).Select(i => $"EQ_Recipe1[{i}]").ToArray();
             _addresses[EquipmentGroups.RecipeOk] = [EquipmentGroups.RecipeOk];
             _addresses[EquipmentGroups.CoatOk] = [EquipmentGroups.CoatOk];
+            _addresses[EquipmentGroups.RecipeLoad] = [EquipmentGroups.RecipeLoad];
         }
         if (controlDefinitions is not null)
         {
@@ -172,6 +173,11 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
                         { SetGroupError(group, "定义读取失败：" + definitionError); continue; }
                         var binding = bindings.GetValueOrDefault(group) ?? new EquipmentBinding(group, false, false, null, "未发现节点");
                         if (!binding.Available) { SetGroupError(group, binding.Error); continue; }
+                        if (EquipmentGroups.IsWriteOnlyRecipeTrigger(group))
+                        {
+                            ApplyWriteOnlyRecipeTrigger(group, binding);
+                            continue;
+                        }
                         try
                         {
                             initial[group] = await session.ReadGroupAsync(group, null, token).ConfigureAwait(false);
@@ -242,7 +248,8 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
 
     private void ApplyValue(string group, DataValue data, EquipmentBinding binding)
     {
-        if (group == EquipmentGroups.RecipeOk || group == EquipmentGroups.CoatOk) { ApplyRecipeFlag(group, data, binding); return; }
+        if (group == EquipmentGroups.RecipeOk || group == EquipmentGroups.CoatOk)
+        { ApplyRecipeFlag(group, data, binding); return; }
         if (EquipmentGroups.IsScalar(group)) { ApplyScalarValue(group, data, binding); return; }
         var array = data.Value as Array;
         var arrayValid = StatusCode.IsGood(data.StatusCode) && !data.StatusCode.Overflow && array is { Rank: 1 }
@@ -287,6 +294,17 @@ public sealed partial class OpcUaEquipmentClient : IOpcUaEquipmentClient
             value is not null && binding.CanWrite && EquipmentGroups.IsWritable(group), _epoch);
         _groups[group] = new(group, value is not null,
             value is null ? "标量质量/类型异常" : binding.CanWrite ? "1点有效，可写" : "1点有效，只读",
+            new Dictionary<string, EquipmentPoint>(StringComparer.Ordinal) { [group] = point });
+        Notify();
+    }
+
+    private void ApplyWriteOnlyRecipeTrigger(string group, EquipmentBinding binding)
+    {
+        var ready = binding.CanWrite && binding.ElementType is not null;
+        var point = new EquipmentPoint(group, null, ready ? AlarmQuality.Good : AlarmQuality.Bad,
+            DateTimeOffset.Now, null, binding.ElementType, ready, _epoch);
+        _groups[group] = new(group, ready,
+            ready ? "仅写触发点有效，可写" : "仅写触发点不可写或类型无效",
             new Dictionary<string, EquipmentPoint>(StringComparer.Ordinal) { [group] = point });
         Notify();
     }

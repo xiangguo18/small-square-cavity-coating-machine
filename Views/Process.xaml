@@ -101,6 +101,9 @@
                                     Command="{Binding ImportRecipeCommand}"
                                     Content="导入配方"/>
                             <Button Style="{StaticResource RecipeActionButtonStyle}"
+                                    Command="{Binding ExportRecipeCommand}"
+                                    Content="配方导出"/>
+                            <Button Style="{StaticResource RecipeActionButtonStyle}"
                                     Command="{Binding ClearRecipeCommand}"
                                     Content="清除配方"/>
                             <Button Style="{StaticResource RecipeActionButtonStyle}"

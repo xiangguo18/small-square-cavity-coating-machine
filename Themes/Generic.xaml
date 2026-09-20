@@ -6,6 +6,7 @@
     <SolidColorBrush x:Key="DeviceOutlineBrush" Color="#263238"/>
     <SolidColorBrush x:Key="DeviceIdleBrush" Color="#F8FAFC"/>
     <SolidColorBrush x:Key="DeviceActiveBrush" Color="#55C878"/>
+    <SolidColorBrush x:Key="DeviceWarningBrush" Color="#F9C74F"/>
     <SolidColorBrush x:Key="DeviceFaultBrush" Color="#EF5350"/>
     <!-- 停流时仅保留两侧管壁轮廓；蓝色虚线作为独立流动层显示。 -->
     <SolidColorBrush x:Key="PipeBodyBrush" Color="#00B8C2CC"/>
@@ -248,12 +249,17 @@
                                     Property="Visibility"
                                     Value="Collapsed"/>
                         </Trigger>
-                        <Trigger Property="IsOpen" Value="True">
+                        <!-- 比例开度阀（APC）由 PercentageFill 独占填色；否则开到位底色会遮住退绿过程。 -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsOpen" Value="True"/>
+                                <Condition Property="UseOpeningPercentage" Value="False"/>
+                            </MultiTrigger.Conditions>
                             <Setter TargetName="ValveBodyTop" Property="Fill"
                                     Value="{StaticResource DeviceActiveBrush}"/>
                             <Setter TargetName="ValveBodyBottom" Property="Fill"
                                     Value="{StaticResource DeviceActiveBrush}"/>
-                        </Trigger>
+                        </MultiTrigger>
                         <Trigger Property="UseOpeningPercentage" Value="True">
                             <Setter TargetName="PercentageFill"
                                     Property="Visibility"
@@ -393,9 +399,51 @@
                             <Setter TargetName="PumpLabelRight" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PumpLabelBottom" Property="Visibility" Value="Visible"/>
                         </Trigger>
-                        <Trigger Property="IsRunning" Value="True">
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Green}">
                             <Setter TargetName="PumpBody" Property="Fill"
                                     Value="{StaticResource DeviceActiveBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Yellow}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceWarningBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Red}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceFaultBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.GreenBlink}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceActiveBrush}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="GreenBlinkStoryboard">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PumpBody"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.25" Duration="0:0:0.5"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="GreenBlinkStoryboard"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.YellowBlink}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceWarningBrush}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="YellowBlinkStoryboard">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PumpBody"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.25" Duration="0:0:0.5"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="YellowBlinkStoryboard"/>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>
@@ -521,9 +569,51 @@
                             <Setter TargetName="PumpLabelRight" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="PumpLabelBottom" Property="Visibility" Value="Visible"/>
                         </Trigger>
-                        <Trigger Property="IsRunning" Value="True">
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Green}">
                             <Setter TargetName="PumpBody" Property="Fill"
                                     Value="{StaticResource DeviceActiveBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Yellow}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceWarningBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.Red}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceFaultBrush}"/>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.GreenBlink}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceActiveBrush}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="GreenBlinkStoryboard">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PumpBody"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.25" Duration="0:0:0.5"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="GreenBlinkStoryboard"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="VisualState" Value="{x:Static controls:PumpVisualState.YellowBlink}">
+                            <Setter TargetName="PumpBody" Property="Fill"
+                                    Value="{StaticResource DeviceWarningBrush}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="YellowBlinkStoryboard">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PumpBody"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.25" Duration="0:0:0.5"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <RemoveStoryboard BeginStoryboardName="YellowBlinkStoryboard"/>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsInterlockReleased" Value="True">
                             <Setter TargetName="InterlockLamp" Property="Fill" Value="#20D34A"/>

@@ -38,6 +38,20 @@ public partial class SampleStageSpeedControl : UserControl
                 0d,
                 FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
 
+    public static readonly DependencyProperty MinimumSetpointProperty =
+        DependencyProperty.Register(
+            nameof(MinimumSetpoint),
+            typeof(double),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(0d));
+
+    public static readonly DependencyProperty MaximumSetpointProperty =
+        DependencyProperty.Register(
+            nameof(MaximumSetpoint),
+            typeof(double),
+            typeof(SampleStageSpeedControl),
+            new FrameworkPropertyMetadata(double.PositiveInfinity));
+
     public static readonly DependencyProperty UnitProperty =
         DependencyProperty.Register(
             nameof(Unit),
@@ -140,6 +154,18 @@ public partial class SampleStageSpeedControl : UserControl
         set => SetValue(SetpointSpeedProperty, value);
     }
 
+    public double MinimumSetpoint
+    {
+        get => (double)GetValue(MinimumSetpointProperty);
+        set => SetValue(MinimumSetpointProperty, value);
+    }
+
+    public double MaximumSetpoint
+    {
+        get => (double)GetValue(MaximumSetpointProperty);
+        set => SetValue(MaximumSetpointProperty, value);
+    }
+
     public string Unit
     {
         get => (string)GetValue(UnitProperty);
@@ -234,7 +260,8 @@ public partial class SampleStageSpeedControl : UserControl
                 CultureInfo.CurrentCulture,
                 out var requestedValue)
             || !double.IsFinite(requestedValue)
-            || requestedValue < 0)
+            || requestedValue < MinimumSetpoint
+            || requestedValue > MaximumSetpoint)
         {
             ShowInvalidSetpoint();
             return;
@@ -262,9 +289,12 @@ public partial class SampleStageSpeedControl : UserControl
 
     private void ShowInvalidSetpoint()
     {
+        var range = double.IsPositiveInfinity(MaximumSetpoint)
+            ? $"大于或等于 {MinimumSetpoint:0.###} {Unit}"
+            : $"{MinimumSetpoint:0.###}～{MaximumSetpoint:0.###} {Unit} 范围内";
         MessageBox.Show(
             Window.GetWindow(this),
-            "样品台转速必须是大于或等于 0 的数字。",
+            $"{DisplayName}必须是 {range}的数字。",
             "样品台转速设置",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);

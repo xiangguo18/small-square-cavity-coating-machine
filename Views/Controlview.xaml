@@ -400,9 +400,10 @@
                                         Command="{Binding ToggleBypassValveCommand}"/>
                                     <controls:DryPumpControl Canvas.Left="720" Canvas.Top="184"
                                         Style="{StaticResource CompactDryPumpStyle}"
-                                        DeviceName="干泵" LabelPlacement="Bottom"
-                                        IsRunning="{Binding DryPumpIsRunning}"
-                                        IsFaulted="{Binding DryPumpIsFaulted}"
+                                         DeviceName="干泵" LabelPlacement="Bottom"
+                                         IsRunning="{Binding DryPumpIsRunning}"
+                                         VisualState="{Binding DryPumpVisualState}"
+                                         IsFaulted="{Binding DryPumpIsFaulted}"
                                         ShowInterlockIndicator="False"
                                         IsInterlockReleased="{Binding DryPumpInterlockReleased}"
                                         Command="{Binding ToggleDryPumpCommand}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
@@ -438,20 +439,29 @@
                                         Style="{StaticResource CompactStraightPipeStyle}"
                                         IsFlowing="{Binding ApcToTurboPipeIsFlowing}"
                                         FlowAnimationDirection="Forward" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <controls:TurbomolecularPumpControl Canvas.Left="609" Canvas.Top="83"
-                                        Style="{StaticResource CompactTurboPumpStyle}"
-                                        DeviceName="分子泵" LabelPlacement="Bottom"
-                                        IsRunning="{Binding TurboPumpIsRunning}"
-                                        IsFaulted="{Binding TurboPumpIsFaulted}"
-                                        ShowInterlockIndicator="False"
-                                        IsInterlockReleased="{Binding TurboPumpInterlockReleased}"
-                                        Command="{Binding ToggleTurboPumpCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                    <controls:SampleStageSpeedControl Canvas.Left="503" Canvas.Top="517"
-                                        Width="295" Height="98" DisplayName="分子泵转速"
-                                        CurrentSpeed="{Binding TurboPumpCurrentSpeed}"
-                                        SetpointSpeed="{Binding TurboPumpSetpointSpeed}"
-                                        Unit="%" ShowDirectionControls="False"
-                                        SetpointCommand="{Binding SetTurboPumpSpeedCommand}" Loaded="SampleStageSpeedControl_Loaded" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                     <controls:TurbomolecularPumpControl Canvas.Left="609" Canvas.Top="83"
+                                         Style="{StaticResource CompactTurboPumpStyle}"
+                                          DeviceName="分子泵" LabelPlacement="Bottom"
+                                         IsRunning="{Binding TurboPumpIsRunning}"
+                                         VisualState="{Binding TurboPumpVisualState}"
+                                         IsFaulted="{Binding TurboPumpIsFaulted}"
+                                         ShowInterlockIndicator="False"
+                                         IsInterlockReleased="{Binding TurboPumpInterlockReleased}"
+                                         Command="{Binding ToggleTurboPumpCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                    <Border Canvas.Left="590" Canvas.Top="168"
+                                            Width="114" Height="38"
+                                            Background="#102535"
+                                            BorderBrush="#263238"
+                                            BorderThickness="2"
+                                            CornerRadius="3">
+                                        <TextBlock Text="{Binding TurboPumpSpeedDisplay}"
+                                                   Foreground="#51C8FF"
+                                                   FontSize="20"
+                                                   FontWeight="Bold"
+                                                   Margin="7,0"
+                                                   TextAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
                                 </Canvas>
                             </Viewbox>
                         </Border>
@@ -732,6 +742,8 @@
                                     IsRunning="{Binding SampleStageIsRunning}"
                                     IsFaulted="{Binding SampleStageIsFaulted}"
                                     Unit="rpm"
+                                    MinimumSetpoint="0"
+                                    MaximumSetpoint="50"
                                     SetpointCommand="{Binding SetSampleStageSpeedCommand}"
                                     ForwardCommand="{Binding StartSampleStageForwardCommand}"
                                     ReverseCommand="{Binding StartSampleStageReverseCommand}"

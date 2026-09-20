@@ -38,7 +38,11 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
             Outcome = "配方运行中" };
         await Task.Run(() => runtime.BeginWrite(pending), token).ConfigureAwait(false);
         _runAudit = pending;
-        await _lease.TransactionAsync(t => FlagAsync(EquipmentGroups.CoatOk, false, t), token).ConfigureAwait(false);
+        await _lease.TransactionAsync(async t =>
+        {
+            await TriggerRecipeLoadAsync(t).ConfigureAwait(false);
+            await FlagAsync(EquipmentGroups.CoatOk, false, t).ConfigureAwait(false);
+        }, token).ConfigureAwait(false);
     }
     public async Task SendLayerAsync(RecipeLayer layer, CancellationToken token)
     {
@@ -82,7 +86,13 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
                 await _lease.ConfirmAsync(group, target, token).ConfigureAwait(false);
             }, token, final);
 
-    private async Task StageAsync(string stage, string address, string value, Func<Task> action, CancellationToken token, bool final = false)
+    private Task TriggerRecipeLoadAsync(CancellationToken token) =>
+        StageAsync("下发配方加载触发", EquipmentGroups.RecipeLoad, "1",
+            () => _lease!.WriteAsync(EquipmentGroups.RecipeLoad,
+                _lease.FlagValue(EquipmentGroups.RecipeLoad, true), token), token, successOutcome: "PLC已接受写入");
+
+    private async Task StageAsync(string stage, string address, string value, Func<Task> action, CancellationToken token,
+        bool final = false, string successOutcome = "PLC已确认")
     {
         var pending = new OperationLogRecord(DateTimeOffset.Now, _lease!.User, _runAudit!.Target, stage,
             false, false, "") { RecipeRunId = _runAudit.RecipeRunId, Outcome = "待处理" };
@@ -96,7 +106,7 @@ public sealed class OpcUaRecipePlcGateway(IOpcUaEquipmentClient client, IEquipme
             catch (Exception save) { reason += "；" + save.Message; }
             throw new InvalidOperationException(stage + "失败：" + reason + "；不自动重试，需人工核对", ex);
         }
-        try { await Task.Run(() => runtime.FinishWrite(pending with { Outcome = "PLC已确认", IsSuccessful = true }, null)).ConfigureAwait(false); }
+        try { await Task.Run(() => runtime.FinishWrite(pending with { Outcome = successOutcome, IsSuccessful = true }, null)).ConfigureAwait(false); }
         catch (Exception ex)
         {
             var text = stage + "：PLC已确认，但本机最终记录保存失败：" + ex.Message;

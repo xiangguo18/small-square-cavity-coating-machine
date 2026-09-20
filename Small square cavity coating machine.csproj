@@ -8,6 +8,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
+    <AssemblyName>单腔室磁控溅射镀膜机</AssemblyName>
+    <AssemblyTitle>单腔室磁控溅射镀膜机</AssemblyTitle>
+    <Product>单腔室磁控溅射镀膜机</Product>
+    <Description>单腔室磁控溅射镀膜机上位机控制软件</Description>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <BaseOutputPath>D:\codex\Winforms\Small square cavity coating machine\bin\Debug</BaseOutputPath>
   </PropertyGroup>

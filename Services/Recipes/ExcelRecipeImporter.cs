@@ -137,7 +137,7 @@ public sealed class ExcelRecipeImporter : IRecipeExcelImporter
 
             if (!rowHasParameterError)
             {
-                layers.Add(CreateLayer(sequence, values));
+                layers.Add(RecipeLayerValues.Create(sequence, values));
             }
         }
 
@@ -152,32 +152,6 @@ public sealed class ExcelRecipeImporter : IRecipeExcelImporter
         }
 
         return new RecipeImportResult(layers, []);
-    }
-
-    private static RecipeLayer CreateLayer(int sequence, IReadOnlyList<double> values)
-    {
-        return new RecipeLayer
-        {
-            Sequence = sequence,
-            CathodeAPower = values[0],
-            CathodeBPower = values[1],
-            PowerSpan = values[2],
-            IntervalSeconds = values[3],
-            PreSputterSeconds = values[4],
-            StageSpeedRpm = values[5],
-            CoatingSeconds = values[6],
-            IgnitionArgonSccm = values[7],
-            WorkingArgonSccm = values[8],
-            IgnitionNitrogenSccm = values[9],
-            WorkingNitrogenSccm = values[10],
-            IgnitionOxygenSccm = values[11],
-            WorkingOxygenSccm = values[12],
-            GasStabilizationSeconds = values[13],
-            IgnitionPressurePa = values[14],
-            WorkingPressurePa = values[15],
-            IgnitionApcPercent = values[16],
-            WorkingApcPercent = values[17]
-        };
     }
 
     private static bool TryReadSequence(object? rawValue, out int sequence)

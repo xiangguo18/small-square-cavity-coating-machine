@@ -14,6 +14,8 @@ namespace Small_square_cavity_coating_machine.ViewModels;
 /// </summary>
 public partial class ControlViewModel : ObservableObject
 {
+    private const double SampleStageMinimumSpeed = 0d;
+    private const double SampleStageMaximumSpeed = 50d;
     private readonly IOperationLogRepository? _operationLogRepository;
     private readonly IAuthorizationService? _authorization;
     private readonly IConfirmationDialogService? _confirmation;
@@ -284,8 +286,6 @@ public partial class ControlViewModel : ObservableObject
     private bool apcIsPositioningMode = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ChamberToApcPipeIsFlowing))]
-    [NotifyPropertyChangedFor(nameof(ApcToTurboPipeIsFlowing))]
     private double apcCurrentPosition = 45d;
 
     [ObservableProperty]
@@ -298,12 +298,14 @@ public partial class ControlViewModel : ObservableObject
     private double apcPressureSetpoint = 1.5d;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChamberToApcPipeIsFlowing))]
+    [NotifyPropertyChangedFor(nameof(ApcToTurboPipeIsFlowing))]
     private bool apcIsOpen = true;
 
     [ObservableProperty]
     private bool apcInterlockReleased = true;
 
-    public bool ChamberToApcPipeIsFlowing => IsPositiveFinite(ApcCurrentPosition);
+    public bool ChamberToApcPipeIsFlowing => ApcIsOpen;
 
     public bool ApcToTurboPipeIsFlowing =>
         ChamberToApcPipeIsFlowing && TurboPumpIsRunning;
@@ -436,7 +438,7 @@ public partial class ControlViewModel : ObservableObject
     {
         if (!EnsureCanOperate()) return;
         if (!TurboPumpIsRunning && !ConfirmAction("分子泵操作确认", "确定启动分子泵？")) return;
-        if (TryQueuePartToggle("TurboPump", TurboPumpIsRunning, 2, 3, "分子泵")) return;
+        if (TryQueuePartToggle("TurboPump", TurboPumpIsRunning, 2, 3, "分子泵", TurboPumpStateKnown)) return;
         TurboPumpIsRunning = !TurboPumpIsRunning;
         LogOperation("分子泵", TurboPumpIsRunning ? "启动" : "停止");
     }
@@ -445,7 +447,7 @@ public partial class ControlViewModel : ObservableObject
     private void ToggleDryPump()
     {
         if (!EnsureCanOperate()) return;
-        if (TryQueuePartToggle("DryPump", DryPumpIsRunning, 0, 1, "干泵")) return;
+        if (TryQueuePartToggle("DryPump", DryPumpIsRunning, 0, 1, "干泵", DryPumpStateKnown)) return;
         DryPumpIsRunning = !DryPumpIsRunning;
         LogOperation("干泵", DryPumpIsRunning ? "启动" : "停止");
     }
@@ -462,6 +464,11 @@ public partial class ControlViewModel : ObservableObject
     private void SetSampleStageSpeed(double value)
     {
         if (!EnsureCanOperate()) return;
+        if (!double.IsFinite(value) || value < SampleStageMinimumSpeed || value > SampleStageMaximumSpeed)
+        {
+            ControlStatusText = "样品台转速允许范围：0～50 rpm";
+            return;
+        }
         SampleStageSetpointSpeed = value;
         if (TryQueueSetpoint(3, value)) { LogOperation("样品台", "设置转速", $"{value:0.###} rpm"); return; }
         LogOperation("样品台", "设置转速", $"{value:0.###} rpm");
